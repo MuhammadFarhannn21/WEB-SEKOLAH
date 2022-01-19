@@ -1,0 +1,43 @@
+Composer.json
+			    "barryvdh/laravel-dompdf": "^0.8.2",
+			    "maatwebsite/excel": "~2.1.0",
+			    "realrashid/sweet-alert": "^1.1",
+			    "intervention/image": "^2.4",
+			    "laravelcollective/html": "^5.4.0",
+			    "unisharp/laravel-filemanager": "~1.8",
+			    "yajra/laravel-datatables-oracle": "^8.7"
+			    composer update
+
+App.php
+				'providers' => [
+								Yajra\DataTables\DataTablesServiceProvider::class,
+						        RealRashid\SweetAlert\SweetAlertServiceProvider::class,
+						        Maatwebsite\Excel\ExcelServiceProvider::class,
+						        Barryvdh\DomPDF\ServiceProvider::class,
+								Collective\Html\HtmlServiceProvider::class,
+						        Intervention\Image\ImageServiceProvider::class,
+						        Unisharp\Laravelfilemanager\LaravelFilemanagerServiceProvider::class,
+				'aliases' => [
+								'Form' => Collective\Html\FormFacade::class,
+								'Alert' => RealRashid\SweetAlert\Facades\Alert::class,
+						        'Excel' => Maatwebsite\Excel\Facades\Excel::class,
+						        'PDF' => Barryvdh\DomPDF\Facade::class,
+
+php artisan vendor:publish --tag=lfm_config
+php artisan vendor:publish --tag=lfm_public
+php artisan storage:link
+php artisan make:auth
+
+AppServiceProvider.php
+folder migration
+
+php artisan make:migration create_users_table --create=users
+php artisan make:migration add_votes_to_users_table --table=users
+php artisan make:migration create_role_users_table --create=role_users     == table fivot
+
+
+membuat helper yg diperhatikan file config/app.php -> aliases
+membuat timezone file config/app.php -> 'timezone' => 'Asia/Jakarta',
+
+kernel.php untuk role
+middleware/role.php

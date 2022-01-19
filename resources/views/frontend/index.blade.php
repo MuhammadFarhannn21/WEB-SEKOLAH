@@ -1,0 +1,13 @@
+@extends('frontend.layouts.master')
+@section('konten')
+		@include('frontend.layouts.slider')
+		@include('frontend.layouts.jurusan')
+		@include('frontend.layouts.video')	
+		@include('frontend.layouts.berita')	
+		@include('frontend.layouts.videosekolah')	
+		@include('frontend.layouts.guruterbaik')	
+		@include('frontend.layouts.slide')
+		@include('frontend.layouts.event')
+		@include('frontend.layouts.jumlahsiswa')
+		@include('frontend.layouts.gallery')
+@endsection
