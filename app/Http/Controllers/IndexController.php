@@ -184,8 +184,8 @@ class IndexController extends Controller
 
     public function jurusanList()
     {
-        $jurusan = \App\Jurusan::where('status','aktif')->orderBy('id','DESC')->get();
-        return view('frontend.jurusanList', compact('jurusan'));
+        $jurusan = \App\Jurusan::orderBy('id','DESC')->get();
+        return view('frontend.jurusan', compact('jurusan'));
     }
 
     public function showJurusan($id)

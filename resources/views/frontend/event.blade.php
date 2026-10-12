@@ -54,7 +54,7 @@
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <small style="color:#999; font-size:11px;">
                                         <i class="fa fa-user" style="margin-right:4px; color:#0F6E56;"></i>
-                                        {{ substr($berita->user->name, 0, 18) }}
+                                        {{ substr($berita->user->name ?? 'Admin', 0, 18) }}
                                     </small>
                                     <a href="{{ url('/event/'.$berita->slug) }}" style="background:#0F6E56; color:#fff; padding:5px 14px; border-radius:20px; font-size:11px; font-weight:600; text-decoration:none;">
                                         Lihat <i class="fa fa-arrow-right"></i>

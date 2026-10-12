@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
 use App\Agenda;
 use Auth;
 use Illuminate\Http\Request;
@@ -75,7 +76,7 @@ class AgendaController extends Controller
         $this->validate($request, [
             'title'         => 'required|string|min:3|unique:categories,title,' . $id
         ]);
-        $request['slug']    = str_slug($request->get('title'), '-');
+        $request['slug']    = Str::slug($request->get('title'), '-');
 
         $user = Agenda::findOrFail($id);        
         $user->update($request->all());

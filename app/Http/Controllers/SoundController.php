@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
 use Auth;
 use App\Sound;
 use App\Category;
@@ -35,11 +36,11 @@ class SoundController extends Controller
             'status'        => 'required',
             'published_at'  => 'required'
         ]);
-        $request['slug']    = str_slug($request->get('title'), '-');
+        $request['slug']    = Str::slug($request->get('title'), '-');
         $request['user_id'] = $request->user()->id;
 
         if($request->file('file')) {
-            $nama       = str_slug($request->get('judul'), '-');
+            $nama       = Str::slug($request->get('judul'), '-');
             $file       = $request->file('file');
             $format     = $file->getClientOriginalExtension();
             $filename   = md5($nama).'.'.$format;

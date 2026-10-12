@@ -13,6 +13,10 @@ class CreateDokumenTable extends Migration
      */
     public function up()
     {
+        if (Schema::hasTable('dokumen')) {
+            return;
+        }
+
         Schema::create('dokumen', function (Blueprint $table) {
             $table->increments('id');
             $table->text('judul');

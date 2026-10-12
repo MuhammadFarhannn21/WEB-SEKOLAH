@@ -47,7 +47,7 @@
                         <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid #f0f0f0;">
                             <span style="color:#888; font-size:13px;">
                                 <i class="fa fa-user" style="color:#0F6E56; margin-right:5px;"></i>
-                                {{ $post->user->name }}
+                                {{ $post->user->name ?? 'Admin' }}
                             </span>
                             <span style="color:#888; font-size:13px;">
                                 <i class="fa fa-calendar" style="color:#0F6E56; margin-right:5px;"></i>

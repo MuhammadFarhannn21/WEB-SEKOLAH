@@ -37,7 +37,7 @@
 							<div class="blog-content"  style="word-wrap: break-word;height: 250px">
 								<h4 class="blog-title"><a href="{{ url('/forum/' . $forum->slug) }}"> {!! substr($forum->title, 0, 30) !!}..</a></h4>
 								<div class="blog-info">
-									<a href="#"><i class="fa fa-user"></i>By: {!! substr($forum->user->name, 0, 20) !!}</a>
+									<a href="#"><i class="fa fa-user"></i>By: {!! substr($forum->user->name ?? 'Admin', 0, 20) !!}</a>
 									<a href="#"><i class="fa fa-archive"></i>{!! substr($forum->category->title, 0, 20) !!}</a>
 									{{-- <a href="#"><i class="fa fa-heart-o"></i>53K</a> --}}
 								</div>
