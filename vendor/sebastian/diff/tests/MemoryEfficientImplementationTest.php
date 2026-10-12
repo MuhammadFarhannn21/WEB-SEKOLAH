@@ -7,13 +7,14 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-
 namespace SebastianBergmann\Diff;
 
-/**
- * @covers SebastianBergmann\Diff\MemoryEfficientLongestCommonSubsequenceCalculator
- */
-final class MemoryEfficientImplementationTest extends LongestCommonSubsequenceTest
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Small;
+
+#[CoversClass(MemoryEfficientLongestCommonSubsequenceCalculator::class)]
+#[Small]
+final class MemoryEfficientImplementationTest extends LongestCommonSubsequenceTestCase
 {
     protected function createImplementation(): LongestCommonSubsequenceCalculator
     {

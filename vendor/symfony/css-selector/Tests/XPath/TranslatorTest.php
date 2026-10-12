@@ -11,7 +11,9 @@
 
 namespace Symfony\Component\CssSelector\Tests\XPath;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\CssSelector\Exception\ExpressionErrorException;
 use Symfony\Component\CssSelector\Node\ElementNode;
 use Symfony\Component\CssSelector\Node\FunctionNode;
 use Symfony\Component\CssSelector\Parser\Parser;
@@ -21,13 +23,13 @@ use Symfony\Component\CssSelector\XPath\XPathExpr;
 
 class TranslatorTest extends TestCase
 {
-    /** @dataProvider getXpathLiteralTestData */
+    #[DataProvider('getXpathLiteralTestData')]
     public function testXpathLiteral($value, $literal)
     {
         $this->assertEquals($literal, Translator::getXpathLiteral($value));
     }
 
-    /** @dataProvider getCssToXPathTestData */
+    #[DataProvider('getCssToXPathTestData')]
     public function testCssToXPath($css, $xpath)
     {
         $translator = new Translator();
@@ -35,29 +37,26 @@ class TranslatorTest extends TestCase
         $this->assertEquals($xpath, $translator->cssToXPath($css, ''));
     }
 
-    /**
-     * @expectedException \Symfony\Component\CssSelector\Exception\ExpressionErrorException
-     */
     public function testCssToXPathPseudoElement()
     {
         $translator = new Translator();
         $translator->registerExtension(new HtmlExtension($translator));
+
+        $this->expectException(ExpressionErrorException::class);
+
         $translator->cssToXPath('e::first-line');
     }
 
-    /**
-     * @expectedException \Symfony\Component\CssSelector\Exception\ExpressionErrorException
-     */
     public function testGetExtensionNotExistsExtension()
     {
         $translator = new Translator();
         $translator->registerExtension(new HtmlExtension($translator));
+
+        $this->expectException(ExpressionErrorException::class);
+
         $translator->getExtension('fake');
     }
 
-    /**
-     * @expectedException \Symfony\Component\CssSelector\Exception\ExpressionErrorException
-     */
     public function testAddCombinationNotExistsExtension()
     {
         $translator = new Translator();
@@ -65,44 +64,47 @@ class TranslatorTest extends TestCase
         $parser = new Parser();
         $xpath = $parser->parse('*')[0];
         $combinedXpath = $parser->parse('*')[0];
+
+        $this->expectException(ExpressionErrorException::class);
+
         $translator->addCombination('fake', $xpath, $combinedXpath);
     }
 
-    /**
-     * @expectedException \Symfony\Component\CssSelector\Exception\ExpressionErrorException
-     */
     public function testAddFunctionNotExistsFunction()
     {
         $translator = new Translator();
         $translator->registerExtension(new HtmlExtension($translator));
         $xpath = new XPathExpr();
         $function = new FunctionNode(new ElementNode(), 'fake');
+
+        $this->expectException(ExpressionErrorException::class);
+
         $translator->addFunction($xpath, $function);
     }
 
-    /**
-     * @expectedException \Symfony\Component\CssSelector\Exception\ExpressionErrorException
-     */
     public function testAddPseudoClassNotExistsClass()
     {
         $translator = new Translator();
         $translator->registerExtension(new HtmlExtension($translator));
         $xpath = new XPathExpr();
+
+        $this->expectException(ExpressionErrorException::class);
+
         $translator->addPseudoClass($xpath, 'fake');
     }
 
-    /**
-     * @expectedException \Symfony\Component\CssSelector\Exception\ExpressionErrorException
-     */
     public function testAddAttributeMatchingClassNotExistsClass()
     {
         $translator = new Translator();
         $translator->registerExtension(new HtmlExtension($translator));
         $xpath = new XPathExpr();
+
+        $this->expectException(ExpressionErrorException::class);
+
         $translator->addAttributeMatching($xpath, '', '', '');
     }
 
-    /** @dataProvider getXmlLangTestData */
+    #[DataProvider('getXmlLangTestData')]
     public function testXmlLang($css, array $elementsId)
     {
         $translator = new Translator();
@@ -110,11 +112,11 @@ class TranslatorTest extends TestCase
         $elements = $document->xpath($translator->cssToXPath($css));
         $this->assertCount(\count($elementsId), $elements);
         foreach ($elements as $element) {
-            $this->assertTrue(\in_array($element->attributes()->id, $elementsId));
+            $this->assertContains((string) $element->attributes()->id, $elementsId);
         }
     }
 
-    /** @dataProvider getHtmlIdsTestData */
+    #[DataProvider('getHtmlIdsTestData')]
     public function testHtmlIds($css, array $elementsId)
     {
         $translator = new Translator();
@@ -125,17 +127,17 @@ class TranslatorTest extends TestCase
         $document->loadHTMLFile(__DIR__.'/Fixtures/ids.html');
         $document = simplexml_import_dom($document);
         $elements = $document->xpath($translator->cssToXPath($css));
-        $this->assertCount(\count($elementsId), $elementsId);
+        $this->assertCount(\count($elementsId), $elements);
         foreach ($elements as $element) {
             if (null !== $element->attributes()->id) {
-                $this->assertTrue(\in_array($element->attributes()->id, $elementsId));
+                $this->assertContains((string) $element->attributes()->id, $elementsId);
             }
         }
         libxml_clear_errors();
         libxml_use_internal_errors($internalErrors);
     }
 
-    /** @dataProvider getHtmlShakespearTestData */
+    #[DataProvider('getHtmlShakespearTestData')]
     public function testHtmlShakespear($css, $count)
     {
         $translator = new Translator();
@@ -149,7 +151,34 @@ class TranslatorTest extends TestCase
         $this->assertCount($count, $elements);
     }
 
-    public function getXpathLiteralTestData()
+    public function testOnlyOfTypeFindsSingleChildrenOfGivenType()
+    {
+        $translator = new Translator();
+        $translator->registerExtension(new HtmlExtension($translator));
+        $document = new \DOMDocument();
+        $document->loadHTML(<<<'HTML'
+            <html>
+              <body>
+                <p>
+                  <span>A</span>
+                </p>
+                <p>
+                  <span>B</span>
+                  <span>C</span>
+                </p>
+              </body>
+            </html>
+            HTML
+        );
+
+        $xpath = new \DOMXPath($document);
+        $nodeList = $xpath->query($translator->cssToXPath('span:only-of-type'));
+
+        $this->assertSame(1, $nodeList->length);
+        $this->assertSame('A', $nodeList->item(0)->textContent);
+    }
+
+    public static function getXpathLiteralTestData()
     {
         return [
             ['foo', "'foo'"],
@@ -159,7 +188,7 @@ class TranslatorTest extends TestCase
         ];
     }
 
-    public function getCssToXPathTestData()
+    public static function getCssToXPathTestData()
     {
         return [
             ['*', '*'],
@@ -187,7 +216,7 @@ class TranslatorTest extends TestCase
             ['e:first-of-type', '*/e[position() = 1]'],
             ['e:last-of-type', '*/e[position() = last()]'],
             ['e:only-child', "*/*[(name() = 'e') and (last() = 1)]"],
-            ['e:only-of-type', 'e[last() = 1]'],
+            ['e:only-of-type', 'e[count(preceding-sibling::e)=0 and count(following-sibling::e)=0]'],
             ['e:empty', 'e[not(*) and not(string-length())]'],
             ['e:EmPTY', 'e[not(*) and not(string-length())]'],
             ['e:root', 'e[not(parent::*)]'],
@@ -203,10 +232,14 @@ class TranslatorTest extends TestCase
             ['e + f', "e/following-sibling::*[(name() = 'f') and (position() = 1)]"],
             ['e ~ f', 'e/following-sibling::f'],
             ['div#container p', "div[@id = 'container']/descendant-or-self::*/p"],
+            [':scope > div[dataimg="<testmessage>"]', "*[1]/div[@dataimg = '<testmessage>']"],
+            [':scope', '*[1]'],
+            ['e:is(section, article) h1', "e[(name() = 'section') or (name() = 'article')]/descendant-or-self::*/h1"],
+            ['e:where(section, article) h1', "e[(name() = 'section') or (name() = 'article')]/descendant-or-self::*/h1"],
         ];
     }
 
-    public function getXmlLangTestData()
+    public static function getXmlLangTestData()
     {
         return [
             [':lang("EN")', ['first', 'second', 'third', 'fourth']],
@@ -221,7 +254,7 @@ class TranslatorTest extends TestCase
         ];
     }
 
-    public function getHtmlIdsTestData()
+    public static function getHtmlIdsTestData()
     {
         return [
             ['div', ['outer-div', 'li-div', 'foobar-div']],
@@ -247,7 +280,7 @@ class TranslatorTest extends TestCase
             ['div[foobar~="cd"]', []],
             ['*[lang|="En"]', ['second-li']],
             ['[lang|="En-us"]', ['second-li']],
-            // Attribute values are case sensitive
+            // Attribute values are case-sensitive
             ['*[lang|="en"]', []],
             ['[lang|="en-US"]', []],
             ['*[lang|="e"]', []],
@@ -286,13 +319,15 @@ class TranslatorTest extends TestCase
             ['li:nth-last-child(-n+1)', ['seventh-li']],
             ['li:nth-last-child(-n+3)', ['fifth-li', 'sixth-li', 'seventh-li']],
             ['ol:first-of-type', ['first-ol']],
-            ['ol:nth-child(1)', ['first-ol']],
+            ['ol:nth-child(4)', ['first-ol']],
             ['ol:nth-of-type(2)', ['second-ol']],
             ['ol:nth-last-of-type(1)', ['second-ol']],
-            ['span:only-child', ['foobar-span']],
+            ['span:only-child', ['foobar-span', 'no-siblings-of-any-type']],
             ['li div:only-child', ['li-div']],
             ['div *:only-child', ['li-div', 'foobar-span']],
             ['p:only-of-type', ['paragraph']],
+            [':only-of-type', ['html', 'li-div', 'foobar-span', 'no-siblings-of-any-type']],
+            ['div#foobar-div :only-of-type', ['foobar-span']],
             ['a:empty', ['name-anchor']],
             ['a:EMpty', ['name-anchor']],
             ['li:empty', ['third-li', 'fourth-li', 'fifth-li', 'sixth-li']],
@@ -300,9 +335,9 @@ class TranslatorTest extends TestCase
             ['html:root', ['html']],
             ['li:root', []],
             ['* :root', []],
-            ['*:contains("link")', ['html', 'outer-div', 'tag-anchor', 'nofollow-anchor']],
-            [':CONtains("link")', ['html', 'outer-div', 'tag-anchor', 'nofollow-anchor']],
-            ['*:contains("LInk")', []],  // case sensitive
+            ['*:contains("link")', ['html', 'nil', 'outer-div', 'tag-anchor', 'nofollow-anchor']],
+            [':CONtains("link")', ['html', 'nil', 'outer-div', 'tag-anchor', 'nofollow-anchor']],
+            ['*:contains("LInk")', []],  // case-sensitive
             ['*:contains("e")', ['html', 'nil', 'outer-div', 'first-ol', 'first-li', 'paragraph', 'p-em']],
             ['*:contains("E")', []],  // case-sensitive
             ['.a', ['first-ol']],
@@ -335,6 +370,17 @@ class TranslatorTest extends TestCase
             [':not(*)', []],
             ['a:not([href])', ['name-anchor']],
             ['ol :Not(li[class])', ['first-li', 'second-li', 'li-div', 'fifth-li', 'sixth-li', 'seventh-li']],
+            [':is(#first-li, #second-li)', ['first-li', 'second-li']],
+            ['a:is(#name-anchor, #tag-anchor)', ['name-anchor', 'tag-anchor']],
+            [':is(.c)', ['first-ol', 'third-li', 'fourth-li']],
+            ['a:is(:not(#name-anchor))', ['tag-anchor', 'nofollow-anchor']],
+            ['a:not(:is(#name-anchor))', ['tag-anchor', 'nofollow-anchor']],
+            [':where(#first-li, #second-li)', ['first-li', 'second-li']],
+            ['a:where(#name-anchor, #tag-anchor)', ['name-anchor', 'tag-anchor']],
+            [':where(.c)', ['first-ol', 'third-li', 'fourth-li']],
+            ['a:where(:not(#name-anchor))', ['tag-anchor', 'nofollow-anchor']],
+            ['a:not(:where(#name-anchor))', ['tag-anchor', 'nofollow-anchor']],
+            ['a:where(:is(#name-anchor), :where(#tag-anchor))', ['name-anchor', 'tag-anchor']],
             // HTML-specific
             [':link', ['link-href', 'tag-anchor', 'nofollow-anchor', 'area-href']],
             [':visited', []],
@@ -344,7 +390,7 @@ class TranslatorTest extends TestCase
         ];
     }
 
-    public function getHtmlShakespearTestData()
+    public static function getHtmlShakespearTestData()
     {
         return [
             ['*', 246],
@@ -393,6 +439,10 @@ class TranslatorTest extends TestCase
             ['div[class|=dialog]', 50], // ? Seems right
             ['div[class!=madeup]', 243], // ? Seems right
             ['div[class~=dialog]', 51], // ? Seems right
+            [':scope > div', 1],
+            [':scope > div > div[class=dialog]', 1],
+            [':scope > div div', 242],
+            ['div:is(div#test .dialog) .direction', 4],
         ];
     }
 }

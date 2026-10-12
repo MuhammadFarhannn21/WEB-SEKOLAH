@@ -1,42 +1,23 @@
-<div class="fun-facts overlay" data-stellar-background-ratio="0.5" style="background-image: url({{ asset(\App\Aplikasi::first()->gambar_total_siswa) }});width: 100%;background-size: cover;background-position: center center">
+@php
+	$stats = [
+		['fa-user',           $site->jumlah_siswa ?? 0,    'Siswa Aktif'],
+		['fa-users',          $site->jumlah_guru ?? 0,     'Guru & Tenaga Pendidik'],
+		['fa-graduation-cap', $site->jumlah_jurusan ?? 0,  'Program Keahlian'],
+		['fa-trophy',         $site->jumlah_prestasi ?? 0, 'Prestasi Diraih'],
+	];
+@endphp
+<section class="m-section m-section-dark" style="padding:72px 0;">
 	<div class="container">
-		<div class="row">
-			<div class="col-lg-3 col-md-6 col-6 wow zoomIn" data-wow-delay="0.4s">
-				<!-- Single Fact -->
-				<div class="single-fact">
-					<i class="fa fa-user"></i>
-					<div class="number"><span class="counter">{{ \App\Aplikasi::first()->jumlah_siswa}}</div>
-					<p>Siswa</p>
+		<div class="m-stats">
+			@foreach($stats as $i => [$icon, $value, $label])
+			<div class="m-stat reveal reveal-d{{ $i + 1 }}">
+				<span class="m-stat-icon"><i class="fa {{ $icon }}"></i></span>
+				<div>
+					<h3 data-count="{{ $value }}">{{ $value }}</h3>
+					<p>{{ $label }}</p>
 				</div>
-				<!--/ End Single Fact -->
 			</div>
-			<div class="col-lg-3 col-md-6 col-6 wow zoomIn" data-wow-delay="0.6s">
-				<!-- Single Fact -->
-				<div class="single-fact">
-					<i class="fa fa-users"></i>
-					<div class="number"><span class="counter">{{ \App\Aplikasi::first()->jumlah_guru}}</div>
-					<p>Guru</p>
-				</div>
-				<!--/ End Single Fact -->
-			</div>
-			<div class="col-lg-3 col-md-6 col-6 wow zoomIn" data-wow-delay="0.8s">
-				<!-- Single Fact -->
-				<div class="single-fact">
-					<i class="fa fa-graduation-cap"></i>
-					<div class="number"><span class="counter">{{ \App\Aplikasi::first()->jumlah_jurusan}}</div>
-					<p>Jurusan</p>
-				</div>
-				<!--/ End Single Fact -->
-			</div>
-			<div class="col-lg-3 col-md-6 col-6 wow zoomIn" data-wow-delay="1s">
-				<!-- Single Fact -->
-				<div class="single-fact">
-					<i class="fa fa-trophy"></i>
-					<div class="number"><span class="counter">{{ \App\Aplikasi::first()->jumlah_prestasi}}</div>
-					<p>Prestasi</p>
-				</div>
-				<!--/ End Single Fact -->
-			</div>
+			@endforeach
 		</div>
 	</div>
-</div>
+</section>

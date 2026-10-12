@@ -1,6 +1,6 @@
 /.idea
+/.php-cs-fixer.php
+/.php-cs-fixer.cache
+/.phpunit.cache
 /composer.lock
 /vendor
-/.php_cs.cache
-/.phpunit.result.cache
-/from.txt.orig

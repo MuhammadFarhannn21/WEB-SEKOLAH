@@ -11,36 +11,24 @@
 
 namespace Symfony\Component\HttpFoundation\Tests\Session\Storage;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Session\Storage\MetadataBag;
 
 /**
  * Test class for MetadataBag.
- *
- * @group time-sensitive
  */
+#[Group('time-sensitive')]
 class MetadataBagTest extends TestCase
 {
-    /**
-     * @var MetadataBag
-     */
-    protected $bag;
+    protected MetadataBag $bag;
+    protected array $array = [];
 
-    protected $array = [];
-
-    protected function setUp()
+    protected function setUp(): void
     {
-        parent::setUp();
         $this->bag = new MetadataBag();
         $this->array = [MetadataBag::CREATED => 1234567, MetadataBag::UPDATED => 12345678, MetadataBag::LIFETIME => 0];
         $this->bag->initialize($this->array);
-    }
-
-    protected function tearDown()
-    {
-        $this->array = [];
-        $this->bag = null;
-        parent::tearDown();
     }
 
     public function testInitialize()
@@ -135,5 +123,24 @@ class MetadataBagTest extends TestCase
         $bag->initialize($sessionMetadata);
 
         $this->assertEquals($timeStamp, $sessionMetadata[MetadataBag::UPDATED]);
+    }
+
+    public function testLifetimeIsInt()
+    {
+        $sessionMetadata = [];
+
+        $bag = new MetadataBag();
+        $bag->initialize($sessionMetadata);
+
+        $this->assertIsInt($bag->getLifetime());
+    }
+
+    public function testCookieLifetimeFromConstructor()
+    {
+        $bag = new MetadataBag('_sf2_meta', 0, 60);
+        $sessionMetadata = [];
+        $bag->initialize($sessionMetadata);
+
+        $this->assertSame(60, $bag->getLifetime());
     }
 }

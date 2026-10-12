@@ -19,7 +19,7 @@
  * @license    http://github.com/padraic/mockery/blob/master/LICENSE New BSD License
  */
 
-require_once __DIR__.'/DummyClasses/Namespaced.php';
+require_once __DIR__ . '/DummyClasses/Namespaced.php';
 
 use Mockery\Adapter\Phpunit\MockeryTestCase;
 use test\Mockery\Stubs\Animal;
@@ -45,14 +45,12 @@ class NamedMockTest extends MockeryTestCase
         $this->assertEquals("dave", $mock->getDave());
     }
 
-    /**
-     * @test
-     * @expectedException Mockery\Exception
-     * @expectedExceptionMessage The mock named 'Mockery\Dave7' has been already defined with a different mock configuration
-     */
+    /** @test */
     public function itShouldThrowIfAttemptingToRedefineNamedMock()
     {
         $mock = Mockery::namedMock("Mockery\Dave7");
+        $this->expectException(\Mockery\Exception::class);
+        $this->expectExceptionMessage("The mock named 'Mockery\Dave7' has been already defined with a different mock configuration");
         $mock = Mockery::namedMock("Mockery\Dave7", "DateTime");
     }
 
@@ -68,10 +66,7 @@ class NamedMockTest extends MockeryTestCase
         $this->assertTrue($gardener->water($cactus));
     }
 
-    /**
-     * @test
-     * @requires PHP 7.0.0
-     */
+    /** @test */
     public function it_gracefully_handles_namespacing()
     {
         $animal = Mockery::namedMock(

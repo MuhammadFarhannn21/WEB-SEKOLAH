@@ -11,7 +11,9 @@
 
 namespace Symfony\Component\HttpKernel\Tests\Log;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Symfony\Component\HttpKernel\Log\Logger;
@@ -22,23 +24,16 @@ use Symfony\Component\HttpKernel\Log\Logger;
  */
 class LoggerTest extends TestCase
 {
-    /**
-     * @var LoggerInterface
-     */
-    private $logger;
+    private Logger $logger;
+    private string $tmpFile;
 
-    /**
-     * @var string
-     */
-    private $tmpFile;
-
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->tmpFile = sys_get_temp_dir().\DIRECTORY_SEPARATOR.'log';
+        $this->tmpFile = tempnam(sys_get_temp_dir(), 'log');
         $this->logger = new Logger(LogLevel::DEBUG, $this->tmpFile);
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         if (!@unlink($this->tmpFile)) {
             file_put_contents($this->tmpFile, '');
@@ -48,7 +43,7 @@ class LoggerTest extends TestCase
     public static function assertLogsMatch(array $expected, array $given)
     {
         foreach ($given as $k => $line) {
-            self::assertThat(1 === preg_match('/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[\+-][0-9]{2}:[0-9]{2} '.preg_quote($expected[$k]).'/', $line), self::isTrue(), "\"$line\" do not match expected pattern \"$expected[$k]\"");
+            self::assertSame(1, preg_match('/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[\+-][0-9]{2}:[0-9]{2} '.preg_quote($expected[$k]).'/', $line), "\"$line\" do not match expected pattern \"$expected[$k]\"");
         }
     }
 
@@ -57,9 +52,9 @@ class LoggerTest extends TestCase
      *
      * @return string[]
      */
-    public function getLogs()
+    public function getLogs(): array
     {
-        return file($this->tmpFile, FILE_IGNORE_NEW_LINES);
+        return file($this->tmpFile, \FILE_IGNORE_NEW_LINES);
     }
 
     public function testImplements()
@@ -67,9 +62,7 @@ class LoggerTest extends TestCase
         $this->assertInstanceOf(LoggerInterface::class, $this->logger);
     }
 
-    /**
-     * @dataProvider provideLevelsAndMessages
-     */
+    #[DataProvider('provideLevelsAndMessages')]
     public function testLogsAtAllLevels($level, $message)
     {
         $this->logger->{$level}($message, ['user' => 'Bob']);
@@ -82,7 +75,7 @@ class LoggerTest extends TestCase
         $this->assertLogsMatch($expected, $this->getLogs());
     }
 
-    public function provideLevelsAndMessages()
+    public static function provideLevelsAndMessages()
     {
         return [
             LogLevel::EMERGENCY => [LogLevel::EMERGENCY, 'message of level emergency with context: {user}'],
@@ -107,27 +100,21 @@ class LoggerTest extends TestCase
         $this->assertSame([], $this->getLogs());
     }
 
-    /**
-     * @expectedException \Psr\Log\InvalidArgumentException
-     */
     public function testThrowsOnInvalidLevel()
     {
+        $this->expectException(InvalidArgumentException::class);
         $this->logger->log('invalid level', 'Foo');
     }
 
-    /**
-     * @expectedException \Psr\Log\InvalidArgumentException
-     */
     public function testThrowsOnInvalidMinLevel()
     {
+        $this->expectException(InvalidArgumentException::class);
         new Logger('invalid');
     }
 
-    /**
-     * @expectedException \Psr\Log\InvalidArgumentException
-     */
     public function testInvalidOutput()
     {
+        $this->expectException(InvalidArgumentException::class);
         new Logger(LogLevel::DEBUG, '/');
     }
 
@@ -142,14 +129,10 @@ class LoggerTest extends TestCase
 
     public function testObjectCastToString()
     {
-        if (method_exists($this, 'createPartialMock')) {
-            $dummy = $this->createPartialMock(DummyTest::class, ['__toString']);
-        } else {
-            $dummy = $this->getMock(DummyTest::class, ['__toString']);
-        }
+        $dummy = $this->createPartialMock(DummyTest::class, ['__toString']);
         $dummy->expects($this->atLeastOnce())
             ->method('__toString')
-            ->will($this->returnValue('DUMMY'));
+            ->willReturn('DUMMY');
 
         $this->logger->warning($dummy);
 
@@ -166,7 +149,7 @@ class LoggerTest extends TestCase
             'int' => 0,
             'float' => 0.5,
             'nested' => ['with object' => new DummyTest()],
-            'object' => new \DateTime(),
+            'object' => new \DateTimeImmutable(),
             'resource' => fopen('php://memory', 'r'),
         ];
 
@@ -191,9 +174,7 @@ class LoggerTest extends TestCase
 
     public function testFormatter()
     {
-        $this->logger = new Logger(LogLevel::DEBUG, $this->tmpFile, function ($level, $message, $context) {
-            return json_encode(['level' => $level, 'message' => $message, 'context' => $context]).\PHP_EOL;
-        });
+        $this->logger = new Logger(LogLevel::DEBUG, $this->tmpFile, fn ($level, $message, $context) => json_encode(['level' => $level, 'message' => $message, 'context' => $context]));
 
         $this->logger->error('An error', ['foo' => 'bar']);
         $this->logger->warning('A warning', ['baz' => 'bar']);
@@ -202,11 +183,31 @@ class LoggerTest extends TestCase
             '{"level":"warning","message":"A warning","context":{"baz":"bar"}}',
         ], $this->getLogs());
     }
+
+    public function testLogsWithoutOutput()
+    {
+        $oldErrorLog = ini_set('error_log', $this->tmpFile);
+
+        $logger = new Logger();
+        $logger->error('test');
+        $logger->critical('test');
+
+        $expected = [
+            '[error] test',
+            '[critical] test',
+        ];
+
+        foreach ($this->getLogs() as $k => $line) {
+            $this->assertSame(1, preg_match('/\[[\w\/\-: ]+\] '.preg_quote($expected[$k]).'/', $line), "\"$line\" do not match expected pattern \"$expected[$k]\"");
+        }
+
+        ini_set('error_log', $oldErrorLog);
+    }
 }
 
 class DummyTest
 {
-    public function __toString()
+    public function __toString(): string
     {
     }
 }

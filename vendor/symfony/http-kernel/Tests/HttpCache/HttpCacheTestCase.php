@@ -12,13 +12,14 @@
 namespace Symfony\Component\HttpKernel\Tests\HttpCache;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\HttpCache\Esi;
 use Symfony\Component\HttpKernel\HttpCache\HttpCache;
 use Symfony\Component\HttpKernel\HttpCache\Store;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
-class HttpCacheTestCase extends TestCase
+abstract class HttpCacheTestCase extends TestCase
 {
     protected $kernel;
     protected $cache;
@@ -29,13 +30,9 @@ class HttpCacheTestCase extends TestCase
     protected $responses;
     protected $catch;
     protected $esi;
+    protected ?Store $store = null;
 
-    /**
-     * @var Store
-     */
-    protected $store;
-
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->kernel = null;
 
@@ -53,11 +50,9 @@ class HttpCacheTestCase extends TestCase
         $this->clearDirectory(sys_get_temp_dir().'/http_cache');
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
-        if ($this->cache) {
-            $this->cache->getStore()->cleanup();
-        }
+        $this->cache?->getStore()->cleanup();
         $this->kernel = null;
         $this->cache = null;
         $this->caches = null;
@@ -91,7 +86,7 @@ class HttpCacheTestCase extends TestCase
         $traces = $this->cache->getTraces();
         $traces = current($traces);
 
-        $this->assertRegExp('/'.$trace.'/', implode(', ', $traces));
+        $this->assertMatchesRegularExpression('/'.$trace.'/', implode(', ', $traces));
     }
 
     public function assertTraceNotContains($trace)
@@ -99,7 +94,7 @@ class HttpCacheTestCase extends TestCase
         $traces = $this->cache->getTraces();
         $traces = current($traces);
 
-        $this->assertNotRegExp('/'.$trace.'/', implode(', ', $traces));
+        $this->assertDoesNotMatchRegularExpression('/'.$trace.'/', implode(', ', $traces));
     }
 
     public function assertExceptionsAreCaught()
@@ -120,16 +115,24 @@ class HttpCacheTestCase extends TestCase
 
         $this->kernel->reset();
 
-        $this->store = new Store(sys_get_temp_dir().'/http_cache');
+        if (!$this->store) {
+            $this->store = $this->createStore();
+        }
 
-        $this->cacheConfig['debug'] = true;
+        if (!isset($this->cacheConfig['debug'])) {
+            $this->cacheConfig['debug'] = true;
+        }
+
+        if (!isset($this->cacheConfig['terminate_on_cache_hit'])) {
+            $this->cacheConfig['terminate_on_cache_hit'] = false;
+        }
 
         $this->esi = $esi ? new Esi() : null;
         $this->cache = new HttpCache($this->kernel, $this->store, $this->esi, $this->cacheConfig);
         $this->request = Request::create($uri, $method, [], $cookies, [], $server);
         $this->request->headers->add($headers);
 
-        $this->response = $this->cache->handle($this->request, HttpKernelInterface::MASTER_REQUEST, $this->catch);
+        $this->response = $this->cache->handle($this->request, HttpKernelInterface::MAIN_REQUEST, $this->catch);
 
         $this->responses[] = $this->response;
     }
@@ -145,9 +148,9 @@ class HttpCacheTestCase extends TestCase
     }
 
     // A basic response with 200 status code and a tiny body.
-    public function setNextResponse($statusCode = 200, array $headers = [], $body = 'Hello World', \Closure $customizer = null)
+    public function setNextResponse($statusCode = 200, array $headers = [], $body = 'Hello World', ?\Closure $customizer = null, ?EventDispatcher $eventDispatcher = null)
     {
-        $this->kernel = new TestHttpKernel($body, $statusCode, $headers, $customizer);
+        $this->kernel = new TestHttpKernel($body, $statusCode, $headers, $customizer, $eventDispatcher);
     }
 
     public function setNextResponses($responses)
@@ -168,7 +171,7 @@ class HttpCacheTestCase extends TestCase
 
         $fp = opendir($directory);
         while (false !== $file = readdir($fp)) {
-            if (!\in_array($file, ['.', '..'])) {
+            if (!\in_array($file, ['.', '..'], true)) {
                 if (is_link($directory.'/'.$file)) {
                     unlink($directory.'/'.$file);
                 } elseif (is_dir($directory.'/'.$file)) {
@@ -181,5 +184,10 @@ class HttpCacheTestCase extends TestCase
         }
 
         closedir($fp);
+    }
+
+    protected function createStore(): Store
+    {
+        return new Store(sys_get_temp_dir().'/http_cache');
     }
 }

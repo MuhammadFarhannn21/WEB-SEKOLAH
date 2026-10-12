@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -12,33 +12,36 @@
 namespace Monolog\Handler;
 
 use Exception;
-use Monolog\TestCase;
-use Monolog\Logger;
-use PHPUnit_Framework_MockObject_MockObject as MockObject;
+use Monolog\Level;
+use PHPUnit\Framework\MockObject\MockObject;
+use Rollbar\RollbarLogger;
 
 /**
  * @author Erik Johansson <erik.pm.johansson@gmail.com>
  * @see    https://rollbar.com/docs/notifier/rollbar-php/
  *
  * @coversDefaultClass Monolog\Handler\RollbarHandler
+ *
+ * @requires function \Rollbar\RollbarLogger::__construct
  */
-class RollbarHandlerTest extends TestCase
+class RollbarHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    /**
-     * @var MockObject
-     */
-    private $rollbarNotifier;
+    private RollbarLogger&MockObject $rollbarLogger;
 
-    /**
-     * @var array
-     */
-    public $reportedExceptionArguments = null;
+    private array $reportedExceptionArguments;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
 
-        $this->setupRollbarNotifierMock();
+        $this->setupRollbarLoggerMock();
+    }
+
+    public function tearDown(): void
+    {
+        parent::tearDown();
+
+        unset($this->rollbarLogger, $this->reportedExceptionArguments);
     }
 
     /**
@@ -49,36 +52,34 @@ class RollbarHandlerTest extends TestCase
     {
         $handler = $this->createHandler();
 
-        $handler->handle($this->createExceptionRecord(Logger::DEBUG));
+        $handler->handle($this->getRecord(Level::Debug, context: ['exception' => $e = new Exception()]));
 
         $this->assertEquals('debug', $this->reportedExceptionArguments['payload']['level']);
+        $this->assertSame($e, $this->reportedExceptionArguments['context']);
     }
 
-    private function setupRollbarNotifierMock()
+    private function setupRollbarLoggerMock()
     {
-        $this->rollbarNotifier = $this->getMockBuilder('RollbarNotifier')
-            ->setMethods(array('report_message', 'report_exception', 'flush'))
+        $config = [
+            'access_token' => 'ad865e76e7fb496fab096ac07b1dbabb',
+            'environment' => 'test',
+        ];
+
+        $this->rollbarLogger = $this->getMockBuilder(RollbarLogger::class)
+            ->setConstructorArgs([$config])
+            ->onlyMethods(['log'])
             ->getMock();
 
-        $that = $this;
-
-        $this->rollbarNotifier
+        $this->rollbarLogger
             ->expects($this->any())
-            ->method('report_exception')
-            ->willReturnCallback(function ($exception, $context, $payload) use ($that) {
-                $that->reportedExceptionArguments = compact('exception', 'context', 'payload');
+            ->method('log')
+            ->willReturnCallback(function ($exception, $context, $payload) {
+                $this->reportedExceptionArguments = compact('exception', 'context', 'payload');
             });
     }
 
-    private function createHandler()
+    private function createHandler(): RollbarHandler
     {
-        return new RollbarHandler($this->rollbarNotifier, Logger::DEBUG);
-    }
-
-    private function createExceptionRecord($level = Logger::DEBUG, $message = 'test', $exception = null)
-    {
-        return $this->getRecord($level, $message, array(
-            'exception' => $exception ?: new Exception()
-        ));
+        return new RollbarHandler($this->rollbarLogger, Level::Debug);
     }
 }

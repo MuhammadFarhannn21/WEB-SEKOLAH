@@ -97,6 +97,25 @@
                 <input type="text" class="form-control" name="judul_sub_berita" value="{{ $aplikasi->judul_sub_berita }}" required />
               </div>
             </div>
+              <div class="form-group">
+                  <label class="text-muted">
+                      <i class="fa fa-eye" style="color:#1a73e8; margin-right:6px;"></i>
+                      Visi Sekolah
+                  </label>
+                  <textarea name="visi" class="form-control" rows="5"
+                      placeholder="Tulis visi sekolah di sini...">{{ $aplikasi->visi }}</textarea>
+              </div>
+
+              <div class="form-group">
+                  <label class="text-muted">
+                      <i class="fa fa-rocket" style="color:#1a73e8; margin-right:6px;"></i>
+                      Misi Sekolah
+                  </label>
+                  <small class="text-muted d-block mb-2">Tulis setiap poin misi di baris baru</small>
+                  <textarea name="misi" class="form-control" rows="10"
+                      placeholder="1. Menyelenggarakan pendidikan berkualitas...&#10;2. Mengembangkan potensi siswa...&#10;3. Membangun karakter...">{{ $aplikasi->misi }}</textarea>
+              </div>
+
             <div class="card-footer">
               <button type="submit" class="btn btn-primary">Simpan </button>
             </div>

@@ -21,17 +21,34 @@
 
 namespace test\Mockery;
 
-use Mockery as m;
+use Mockery;
 use Mockery\Spy;
 use Mockery\Exception\InvalidCountException;
 use PHPUnit\Framework\TestCase;
 
-class AllowsExpectsSyntaxTest extends TestCase
+class ClassWithAllowsMethod
+{
+    public function allows()
+    {
+        return 123;
+    }
+}
+
+class ClassWithExpectsMethod
+{
+    public function expects()
+    {
+        return 123;
+    }
+}
+
+
+class AllowsExpectsSyntaxTest extends Mockery\Adapter\Phpunit\MockeryTestCase
 {
     /** @test */
     public function allowsSetsUpMethodStub()
     {
-        $stub = m::mock();
+        $stub = Mockery::mock();
         $stub->allows()->foo(123)->andReturns(456);
 
         $this->assertEquals(456, $stub->foo(123));
@@ -40,7 +57,7 @@ class AllowsExpectsSyntaxTest extends TestCase
     /** @test */
     public function allowsCanTakeAnArrayOfCalls()
     {
-        $stub = m::mock();
+        $stub = Mockery::mock();
         $stub->allows([
             "foo" => "bar",
             "bar" => "baz",
@@ -53,7 +70,7 @@ class AllowsExpectsSyntaxTest extends TestCase
     /** @test */
     public function allowsCanTakeAString()
     {
-        $stub = m::mock();
+        $stub = Mockery::mock();
         $stub->allows("foo")->andReturns("bar");
         $this->assertEquals("bar", $stub->foo());
     }
@@ -61,7 +78,7 @@ class AllowsExpectsSyntaxTest extends TestCase
     /** @test */
     public function expects_can_optionally_match_on_any_arguments()
     {
-        $mock = m::mock();
+        $mock = Mockery::mock();
         $mock->allows()->foo()->withAnyArgs()->andReturns(123);
 
         $this->assertEquals(123, $mock->foo(456, 789));
@@ -70,7 +87,7 @@ class AllowsExpectsSyntaxTest extends TestCase
     /** @test */
     public function expects_can_take_a_string()
     {
-        $mock = m::mock();
+        $mock = Mockery::mock();
         $mock->expects("foo")->andReturns(123);
 
         $this->assertEquals(123, $mock->foo(456, 789));
@@ -79,33 +96,51 @@ class AllowsExpectsSyntaxTest extends TestCase
     /** @test */
     public function expectsSetsUpExpectationOfOneCall()
     {
-        $mock = m::mock();
+        $mock = Mockery::mock();
         $mock->expects()->foo(123);
 
         $this->expectException("Mockery\Exception\InvalidCountException");
-        m::close();
+        Mockery::close();
     }
 
     /** @test */
     public function callVerificationCountCanBeOverridenAfterExpectsThrowsExceptionWhenIncorrectNumberOfCalls()
     {
-        $mock = m::mock();
+        $mock = Mockery::mock();
         $mock->expects()->foo(123)->twice();
 
         $mock->foo(123);
-        $this->expectException("Mockery\Exception\InvalidCountException");
-        m::close();
+        $this->expectException(\Mockery\Exception\InvalidCountException::class);
+        Mockery::close();
     }
 
     /** @test */
     public function callVerificationCountCanBeOverridenAfterExpects()
     {
-        $mock = m::mock();
+        $mock = Mockery::mock();
         $mock->expects()->foo(123)->twice();
 
         $mock->foo(123);
         $mock->foo(123);
+    }
 
-        m::close();
+    /** @test */
+    public function generateSkipsAllowsMethodIfAlreadyExists()
+    {
+        $stub = Mockery::mock("test\Mockery\ClassWithAllowsMethod");
+
+        $stub->shouldReceive('allows')->andReturn(123);
+
+        $this->assertEquals(123, $stub->allows());
+    }
+
+    /** @test */
+    public function generateSkipsExpectsMethodIfAlreadyExists()
+    {
+        $stub = Mockery::mock("test\Mockery\ClassWithExpectsMethod");
+
+        $stub->shouldReceive('expects')->andReturn(123);
+
+        $this->assertEquals(123, $stub->expects());
     }
 }

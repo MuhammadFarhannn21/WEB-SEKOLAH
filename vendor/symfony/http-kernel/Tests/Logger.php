@@ -11,23 +11,23 @@
 
 namespace Symfony\Component\HttpKernel\Tests;
 
-use Psr\Log\LoggerInterface;
+use Psr\Log\AbstractLogger;
 
-class Logger implements LoggerInterface
+class Logger extends AbstractLogger
 {
-    protected $logs;
+    protected array $logs;
 
     public function __construct()
     {
         $this->clear();
     }
 
-    public function getLogs($level = false)
+    public function getLogsForLevel(string $level): array
     {
-        return false === $level ? $this->logs : $this->logs[$level];
+        return $this->logs[$level];
     }
 
-    public function clear()
+    public function clear(): void
     {
         $this->logs = [
             'emergency' => [],
@@ -41,48 +41,8 @@ class Logger implements LoggerInterface
         ];
     }
 
-    public function log($level, $message, array $context = [])
+    public function log($level, $message, array $context = []): void
     {
         $this->logs[$level][] = $message;
-    }
-
-    public function emergency($message, array $context = [])
-    {
-        $this->log('emergency', $message, $context);
-    }
-
-    public function alert($message, array $context = [])
-    {
-        $this->log('alert', $message, $context);
-    }
-
-    public function critical($message, array $context = [])
-    {
-        $this->log('critical', $message, $context);
-    }
-
-    public function error($message, array $context = [])
-    {
-        $this->log('error', $message, $context);
-    }
-
-    public function warning($message, array $context = [])
-    {
-        $this->log('warning', $message, $context);
-    }
-
-    public function notice($message, array $context = [])
-    {
-        $this->log('notice', $message, $context);
-    }
-
-    public function info($message, array $context = [])
-    {
-        $this->log('info', $message, $context);
-    }
-
-    public function debug($message, array $context = [])
-    {
-        $this->log('debug', $message, $context);
     }
 }

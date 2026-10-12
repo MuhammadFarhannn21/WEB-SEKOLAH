@@ -64,9 +64,10 @@
                     </table>
                 </div>
                 <div class="tab-pane p-3" id="profile2" role="tabpanel">
-                    {!! Form::open(['url' => 'admin/banner/store', 'method' => 'POST']) !!}
-                        @include('backend.admin.banner._form')
-                    {!! Form::close() !!}
+                <form action="{{ url('admin/banner/store') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    @include('backend.admin.banner._form')
+                </form>
                 </div>
 
             </div>

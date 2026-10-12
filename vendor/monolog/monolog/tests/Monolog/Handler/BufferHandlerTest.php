@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,12 +11,11 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 
-class BufferHandlerTest extends TestCase
+class BufferHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    private $shutdownCheckHandler;
+    private TestHandler $shutdownCheckHandler;
 
     /**
      * @covers Monolog\Handler\BufferHandler::__construct
@@ -27,13 +26,13 @@ class BufferHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new BufferHandler($test);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
         $this->assertFalse($test->hasDebugRecords());
         $this->assertFalse($test->hasInfoRecords());
         $handler->close();
         $this->assertTrue($test->hasInfoRecords());
-        $this->assertTrue(count($test->getRecords()) === 2);
+        $this->assertCount(2, $test->getRecords());
     }
 
     /**
@@ -44,10 +43,10 @@ class BufferHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new BufferHandler($test);
-        $handler->handle($this->getRecord(Logger::WARNING));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler->handle($this->getRecord(Level::Warning));
+        $handler->handle($this->getRecord(Level::Debug));
         $this->shutdownCheckHandler = $test;
-        register_shutdown_function(array($this, 'checkPropagation'));
+        register_shutdown_function([$this, 'checkPropagation']);
     }
 
     public function checkPropagation()
@@ -65,10 +64,10 @@ class BufferHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new BufferHandler($test, 2);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
+        $handler->handle($this->getRecord(Level::Warning));
         $handler->close();
         $this->assertTrue($test->hasWarningRecords());
         $this->assertTrue($test->hasInfoRecords());
@@ -81,22 +80,22 @@ class BufferHandlerTest extends TestCase
     public function testHandleBufferLimitWithFlushOnOverflow()
     {
         $test = new TestHandler();
-        $handler = new BufferHandler($test, 3, Logger::DEBUG, true, true);
+        $handler = new BufferHandler($test, 3, Level::Debug, true, true);
 
         // send two records
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Debug));
         $this->assertFalse($test->hasDebugRecords());
         $this->assertCount(0, $test->getRecords());
 
         // overflow
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler->handle($this->getRecord(Level::Info));
         $this->assertTrue($test->hasDebugRecords());
         $this->assertCount(3, $test->getRecords());
 
         // should buffer again
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertCount(3, $test->getRecords());
 
         $handler->close();
@@ -111,11 +110,11 @@ class BufferHandlerTest extends TestCase
     public function testHandleLevel()
     {
         $test = new TestHandler();
-        $handler = new BufferHandler($test, 0, Logger::INFO);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
-        $handler->handle($this->getRecord(Logger::WARNING));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler = new BufferHandler($test, 0, Level::Info);
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
+        $handler->handle($this->getRecord(Level::Warning));
+        $handler->handle($this->getRecord(Level::Debug));
         $handler->close();
         $this->assertTrue($test->hasWarningRecords());
         $this->assertTrue($test->hasInfoRecords());
@@ -129,8 +128,8 @@ class BufferHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new BufferHandler($test, 0);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
         $handler->flush();
         $this->assertTrue($test->hasInfoRecords());
         $this->assertTrue($test->hasDebugRecords());
@@ -145,14 +144,34 @@ class BufferHandlerTest extends TestCase
         $test = new TestHandler();
         $handler = new BufferHandler($test);
         $handler->pushProcessor(function ($record) {
-            $record['extra']['foo'] = true;
+            $record->extra['foo'] = true;
 
             return $record;
         });
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $handler->flush();
         $this->assertTrue($test->hasWarningRecords());
         $records = $test->getRecords();
         $this->assertTrue($records[0]['extra']['foo']);
+    }
+
+    public function testSetHandler()
+    {
+        $testOriginal = new TestHandler();
+        $handler = new BufferHandler($testOriginal);
+        $handler->handle($this->getRecord(Level::Info));
+
+        $testNew = new TestHandler();
+        $handler->setHandler($testNew);
+
+        $handler->handle($this->getRecord(Level::Debug));
+
+        $handler->close();
+
+        $this->assertFalse($testOriginal->hasInfoRecords());
+        $this->assertFalse($testOriginal->hasDebugRecords());
+        $this->assertTrue($testNew->hasInfoRecords());
+        $this->assertTrue($testNew->hasDebugRecords());
+        $this->assertCount(2, $testNew->getRecords());
     }
 }

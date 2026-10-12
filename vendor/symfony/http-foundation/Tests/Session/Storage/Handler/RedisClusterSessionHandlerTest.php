@@ -11,11 +11,14 @@
 
 namespace Symfony\Component\HttpFoundation\Tests\Session\Storage\Handler;
 
+use PHPUnit\Framework\Attributes\Group;
+
+#[Group('integration')]
 class RedisClusterSessionHandlerTest extends AbstractRedisSessionHandlerTestCase
 {
-    public static function setupBeforeClass()
+    public static function setUpBeforeClass(): void
     {
-        if (!class_exists('RedisCluster')) {
+        if (!class_exists(\RedisCluster::class)) {
             self::markTestSkipped('The RedisCluster class is required.');
         }
 

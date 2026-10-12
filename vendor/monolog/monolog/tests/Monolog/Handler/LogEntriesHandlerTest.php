@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,74 +11,76 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
+use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * @author Robert Kaufmann III <rok3@rok3.me>
  */
-class LogEntriesHandlerTest extends TestCase
+class LogEntriesHandlerTest extends \Monolog\Test\MonologTestCase
 {
     /**
      * @var resource
      */
     private $res;
 
-    /**
-     * @var LogEntriesHandler
-     */
-    private $handler;
+    private LogEntriesHandler&MockObject $handler;
+
+    public function tearDown(): void
+    {
+        parent::tearDown();
+
+        unset($this->res);
+        unset($this->handler);
+    }
 
     public function testWriteContent()
     {
         $this->createHandler();
-        $this->handler->handle($this->getRecord(Logger::CRITICAL, 'Critical write test'));
+        $this->handler->handle($this->getRecord(Level::Critical, 'Critical write test'));
 
         fseek($this->res, 0);
         $content = fread($this->res, 1024);
 
-        $this->assertRegexp('/testToken \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] test.CRITICAL: Critical write test/', $content);
+        $this->assertMatchesRegularExpression('/testToken \[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+00:00\] test.CRITICAL: Critical write test/', $content);
     }
 
     public function testWriteBatchContent()
     {
-        $records = array(
+        $records = [
             $this->getRecord(),
             $this->getRecord(),
             $this->getRecord(),
-        );
+        ];
         $this->createHandler();
         $this->handler->handleBatch($records);
 
         fseek($this->res, 0);
         $content = fread($this->res, 1024);
 
-        $this->assertRegexp('/(testToken \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] .* \[\] \[\]\n){3}/', $content);
+        $this->assertMatchesRegularExpression('/(testToken \[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+00:00\] .* \[\] \[\]\n){3}/', $content);
     }
 
     private function createHandler()
     {
-        $useSSL = extension_loaded('openssl');
-        $args = array('testToken', $useSSL, Logger::DEBUG, true);
+        $useSSL = \extension_loaded('openssl');
+        $args = ['testToken', $useSSL, Level::Debug, true];
         $this->res = fopen('php://memory', 'a');
-        $this->handler = $this->getMock(
-            '\Monolog\Handler\LogEntriesHandler',
-            array('fsockopen', 'streamSetTimeout', 'closeSocket'),
-            $args
-        );
+        $this->handler = $this->getMockBuilder('Monolog\Handler\LogEntriesHandler')
+            ->setConstructorArgs($args)
+            ->onlyMethods(['fsockopen', 'streamSetTimeout', 'closeSocket'])
+            ->getMock();
 
-        $reflectionProperty = new \ReflectionProperty('\Monolog\Handler\SocketHandler', 'connectionString');
-        $reflectionProperty->setAccessible(true);
+        $reflectionProperty = new \ReflectionProperty('Monolog\Handler\SocketHandler', 'connectionString');
         $reflectionProperty->setValue($this->handler, 'localhost:1234');
 
         $this->handler->expects($this->any())
             ->method('fsockopen')
-            ->will($this->returnValue($this->res));
+            ->willReturn($this->res);
         $this->handler->expects($this->any())
             ->method('streamSetTimeout')
-            ->will($this->returnValue(true));
+            ->willReturn(true);
         $this->handler->expects($this->any())
-            ->method('closeSocket')
-            ->will($this->returnValue(true));
+            ->method('closeSocket');
     }
 }

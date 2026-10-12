@@ -11,9 +11,12 @@
 
 namespace Symfony\Component\Translation\Tests\Command;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Tester\CommandCompletionTester;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Translation\Command\XliffLintCommand;
 
@@ -24,7 +27,7 @@ use Symfony\Component\Translation\Command\XliffLintCommand;
  */
 class XliffLintCommandTest extends TestCase
 {
-    private $files;
+    private array $files;
 
     public function testLintCorrectFile()
     {
@@ -36,8 +39,8 @@ class XliffLintCommandTest extends TestCase
             ['verbosity' => OutputInterface::VERBOSITY_VERBOSE, 'decorated' => false]
         );
 
-        $this->assertEquals(0, $tester->getStatusCode(), 'Returns 0 in case of success');
-        $this->assertContains('OK', trim($tester->getDisplay()));
+        $tester->assertCommandIsSuccessful('Returns 0 in case of success');
+        $this->assertStringContainsString('OK', trim($tester->getDisplay()));
     }
 
     public function testLintCorrectFiles()
@@ -51,13 +54,11 @@ class XliffLintCommandTest extends TestCase
             ['verbosity' => OutputInterface::VERBOSITY_VERBOSE, 'decorated' => false]
         );
 
-        $this->assertEquals(0, $tester->getStatusCode(), 'Returns 0 in case of success');
-        $this->assertContains('OK', trim($tester->getDisplay()));
+        $tester->assertCommandIsSuccessful('Returns 0 in case of success');
+        $this->assertStringContainsString('OK', trim($tester->getDisplay()));
     }
 
-    /**
-     * @dataProvider provideStrictFilenames
-     */
+    #[DataProvider('provideStrictFilenames')]
     public function testStrictFilenames($requireStrictFileNames, $fileNamePattern, $targetLanguage, $mustFail)
     {
         $tester = $this->createCommandTester($requireStrictFileNames);
@@ -69,7 +70,7 @@ class XliffLintCommandTest extends TestCase
         );
 
         $this->assertEquals($mustFail ? 1 : 0, $tester->getStatusCode());
-        $this->assertContains($mustFail ? '[WARNING] 0 XLIFF files have valid syntax and 1 contain errors.' : '[OK] All 1 XLIFF files contain valid syntax.', $tester->getDisplay());
+        $this->assertStringContainsString($mustFail ? '[WARNING] 0 XLIFF files have valid syntax and 1 contain errors.' : '[OK] All 1 XLIFF files contain valid syntax.', $tester->getDisplay());
     }
 
     public function testLintIncorrectXmlSyntax()
@@ -80,7 +81,7 @@ class XliffLintCommandTest extends TestCase
         $tester->execute(['filename' => $filename], ['decorated' => false]);
 
         $this->assertEquals(1, $tester->getStatusCode(), 'Returns 1 in case of error');
-        $this->assertContains('Opening and ending tag mismatch: target line 6 and source', trim($tester->getDisplay()));
+        $this->assertStringContainsString('Opening and ending tag mismatch: target line 6 and source', trim($tester->getDisplay()));
     }
 
     public function testLintIncorrectTargetLanguage()
@@ -91,17 +92,38 @@ class XliffLintCommandTest extends TestCase
         $tester->execute(['filename' => $filename], ['decorated' => false]);
 
         $this->assertEquals(1, $tester->getStatusCode(), 'Returns 1 in case of error');
-        $this->assertContains('There is a mismatch between the language included in the file name ("messages.en.xlf") and the "es" value used in the "target-language" attribute of the file.', trim($tester->getDisplay()));
+        $this->assertStringContainsString('There is a mismatch between the language included in the file name ("messages.en.xlf") and the "es" value used in the "target-language" attribute of the file.', trim($tester->getDisplay()));
     }
 
-    /**
-     * @expectedException \RuntimeException
-     */
+    public function testLintTargetLanguageIsCaseInsensitive()
+    {
+        $tester = $this->createCommandTester();
+        $filename = $this->createFile('note', 'zh-cn', 'messages.zh_CN.xlf');
+
+        $tester->execute(['filename' => $filename], ['decorated' => false]);
+
+        $tester->assertCommandIsSuccessful();
+        $this->assertStringContainsString('[OK] All 1 XLIFF files contain valid syntax.', trim($tester->getDisplay()));
+    }
+
+    public function testLintSucceedsWhenLocaleInFileAndInTargetLanguageNameUsesDashesInsteadOfUnderscores()
+    {
+        $tester = $this->createCommandTester();
+        $filename = $this->createFile('note', 'en-GB', 'messages.en-GB.xlf');
+
+        $tester->execute(['filename' => $filename], ['decorated' => false]);
+
+        $tester->assertCommandIsSuccessful();
+        $this->assertStringContainsString('[OK] All 1 XLIFF files contain valid syntax.', trim($tester->getDisplay()));
+    }
+
     public function testLintFileNotReadable()
     {
         $tester = $this->createCommandTester();
         $filename = $this->createFile();
         unlink($filename);
+
+        $this->expectException(\RuntimeException::class);
 
         $tester->execute(['filename' => $filename], ['decorated' => false]);
     }
@@ -110,47 +132,72 @@ class XliffLintCommandTest extends TestCase
     {
         $command = new XliffLintCommand();
         $expected = <<<EOF
-The <info>%command.name%</info> command lints a XLIFF file and outputs to STDOUT
-the first encountered syntax error.
+            Or of a whole directory:
 
-You can validates XLIFF contents passed from STDIN:
+              <info>php %command.full_name% dirname</info>
 
-  <info>cat filename | php %command.full_name%</info>
+            The <info>--format</info> option specifies the format of the command output:
 
-You can also validate the syntax of a file:
+              <info>php %command.full_name% dirname --format=json</info>
+            EOF;
 
-  <info>php %command.full_name% filename</info>
-
-Or of a whole directory:
-
-  <info>php %command.full_name% dirname</info>
-  <info>php %command.full_name% dirname --format=json</info>
-
-EOF;
-
-        $this->assertEquals($expected, $command->getHelp());
+        $this->assertStringContainsString($expected, $command->getHelp());
     }
 
-    /**
-     * @return string Path to the new file
-     */
-    private function createFile($sourceContent = 'note', $targetLanguage = 'en', $fileNamePattern = 'messages.%locale%.xlf')
+    public function testLintIncorrectFileWithGithubFormat()
+    {
+        $filename = $this->createFile('note <target>');
+        $tester = $this->createCommandTester();
+        $tester->execute(['filename' => [$filename], '--format' => 'github'], ['decorated' => false]);
+        self::assertEquals(1, $tester->getStatusCode(), 'Returns 1 in case of error');
+        self::assertStringMatchesFormat('%A::error file=%s,line=6,col=47::Opening and ending tag mismatch: target line 6 and source%A', trim($tester->getDisplay()));
+    }
+
+    public function testLintAutodetectsGithubActionEnvironment()
+    {
+        $prev = getenv('GITHUB_ACTIONS');
+        putenv('GITHUB_ACTIONS');
+
+        try {
+            putenv('GITHUB_ACTIONS=1');
+
+            $filename = $this->createFile('note <target>');
+            $tester = $this->createCommandTester();
+
+            $tester->execute(['filename' => [$filename]], ['decorated' => false]);
+            self::assertStringMatchesFormat('%A::error file=%s,line=6,col=47::Opening and ending tag mismatch: target line 6 and source%A', trim($tester->getDisplay()));
+        } finally {
+            putenv('GITHUB_ACTIONS'.($prev ? "=$prev" : ''));
+        }
+    }
+
+    public function testPassingClosureAndCallableToConstructor()
+    {
+        $command = new XliffLintCommand('translation:xliff:lint',
+            $this->testPassingClosureAndCallableToConstructor(...),
+            [$this, 'testPassingClosureAndCallableToConstructor']
+        );
+
+        self::assertInstanceOf(XliffLintCommand::class, $command);
+    }
+
+    private function createFile($sourceContent = 'note', $targetLanguage = 'en', $fileNamePattern = 'messages.%locale%.xlf'): string
     {
         $xliffContent = <<<XLIFF
-<?xml version="1.0"?>
-<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
-    <file source-language="en" target-language="$targetLanguage" datatype="plaintext" original="file.ext">
-        <body>
-            <trans-unit id="note">
-                <source>$sourceContent</source>
-                <target>NOTE</target>
-            </trans-unit>
-        </body>
-    </file>
-</xliff>
-XLIFF;
+            <?xml version="1.0"?>
+            <xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+                <file source-language="en" target-language="$targetLanguage" datatype="plaintext" original="file.ext">
+                    <body>
+                        <trans-unit id="note">
+                            <source>$sourceContent</source>
+                            <target>NOTE</target>
+                        </trans-unit>
+                    </body>
+                </file>
+            </xliff>
+            XLIFF;
 
-        $filename = sprintf('%s/translation-xliff-lint-test/%s', sys_get_temp_dir(), str_replace('%locale%', 'en', $fileNamePattern));
+        $filename = \sprintf('%s/translation-xliff-lint-test/%s', sys_get_temp_dir(), str_replace('%locale%', 'en', $fileNamePattern));
         file_put_contents($filename, $xliffContent);
 
         $this->files[] = $filename;
@@ -158,42 +205,47 @@ XLIFF;
         return $filename;
     }
 
-    /**
-     * @return CommandTester
-     */
-    private function createCommandTester($requireStrictFileNames = true, $application = null)
+    private function createCommand($requireStrictFileNames = true, $application = null): Command
     {
         if (!$application) {
             $application = new Application();
-            $application->add(new XliffLintCommand(null, null, null, $requireStrictFileNames));
+            $command = new XliffLintCommand(null, null, null, $requireStrictFileNames);
+            if (method_exists($application, 'addCommand')) {
+                $application->addCommand($command);
+            } else {
+                $application->add($command);
+            }
         }
 
         $command = $application->find('lint:xliff');
 
-        if ($application) {
-            $command->setApplication($application);
-        }
+        $command->setApplication($application);
 
-        return new CommandTester($command);
+        return $command;
     }
 
-    protected function setUp()
+    private function createCommandTester($requireStrictFileNames = true, $application = null): CommandTester
+    {
+        return new CommandTester($this->createCommand($requireStrictFileNames, $application));
+    }
+
+    protected function setUp(): void
     {
         $this->files = [];
         @mkdir(sys_get_temp_dir().'/translation-xliff-lint-test');
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         foreach ($this->files as $file) {
             if (file_exists($file)) {
-                unlink($file);
+                @unlink($file);
             }
         }
-        rmdir(sys_get_temp_dir().'/translation-xliff-lint-test');
+        @rmdir(sys_get_temp_dir().'/translation-xliff-lint-test');
     }
 
-    public function provideStrictFilenames()
+    public static function provideStrictFilenames()
     {
         yield [false, 'messages.%locale%.xlf', 'en', false];
         yield [false, 'messages.%locale%.xlf', 'es', true];
@@ -203,5 +255,18 @@ XLIFF;
         yield [true, 'messages.%locale%.xlf', 'es', true];
         yield [true, '%locale%.messages.xlf', 'en', true];
         yield [true, '%locale%.messages.xlf', 'es', true];
+    }
+
+    #[DataProvider('provideCompletionSuggestions')]
+    public function testComplete(array $input, array $expectedSuggestions)
+    {
+        $tester = new CommandCompletionTester($this->createCommand());
+
+        $this->assertSame($expectedSuggestions, $tester->complete($input));
+    }
+
+    public static function provideCompletionSuggestions()
+    {
+        yield 'option' => [['--format', ''], ['txt', 'json', 'github']];
     }
 }

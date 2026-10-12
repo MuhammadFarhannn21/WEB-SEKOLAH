@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2018 Justin Hileman
+ * (c) 2012-2026 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -12,19 +12,29 @@
 namespace Psy\Test\Readline;
 
 use Psy\Readline\GNUReadline;
+use Psy\Test\TestCase;
 
-class GNUReadlineTest extends \PHPUnit\Framework\TestCase
+class GNUReadlineTest extends TestCase
 {
     private $historyFile;
 
-    public function setUp()
+    /**
+     * @before
+     */
+    public function getReady()
     {
         if (!GNUReadline::isSupported()) {
             $this->markTestSkipped('GNUReadline not enabled');
         }
 
-        $this->historyFile = \tempnam(\sys_get_temp_dir(), 'psysh_test_history');
+        $this->historyFile = \tempnam(\sys_get_temp_dir(), 'psysh-test-history-');
         \file_put_contents($this->historyFile, "_HiStOrY_V2_\n");
+    }
+
+    public function testReadlineName()
+    {
+        $readline = new GNUReadline($this->historyFile);
+        $this->assertSame(\readline_info('readline_name'), 'psysh');
     }
 
     public function testHistory()

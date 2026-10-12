@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,93 +11,91 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * @covers Monolog\Handler\ChromePHPHandler
  */
-class ChromePHPHandlerTest extends TestCase
+class ChromePHPHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    protected function setUp()
+    protected function setUp(): void
     {
         TestChromePHPHandler::resetStatic();
         $_SERVER['HTTP_USER_AGENT'] = 'Monolog Test; Chrome/1.0';
     }
 
-    /**
-     * @dataProvider agentsProvider
-     */
+    #[DataProvider('agentsProvider')]
     public function testHeaders($agent)
     {
         $_SERVER['HTTP_USER_AGENT'] = $agent;
 
         $handler = new TestChromePHPHandler();
         $handler->setFormatter($this->getIdentityFormatter());
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Warning));
 
-        $expected = array(
-            'X-ChromeLogger-Data'   => base64_encode(utf8_encode(json_encode(array(
-                'version' => ChromePHPHandler::VERSION,
-                'columns' => array('label', 'log', 'backtrace', 'type'),
-                'rows' => array(
+        $expected = [
+            'X-ChromeLogger-Data'   => base64_encode(json_encode([
+                'version' => '4.0',
+                'columns' => ['label', 'log', 'backtrace', 'type'],
+                'rows' => [
                     'test',
                     'test',
-                ),
+                ],
                 'request_uri' => '',
-            )))),
-        );
+            ])),
+        ];
 
         $this->assertEquals($expected, $handler->getHeaders());
     }
 
     public static function agentsProvider()
     {
-        return array(
-            array('Monolog Test; Chrome/1.0'),
-            array('Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'),
-            array('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/56.0.2924.76 Chrome/56.0.2924.76 Safari/537.36'),
-            array('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome Safari/537.36'),
-        );
+        return [
+            ['Monolog Test; Chrome/1.0'],
+            ['Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'],
+            ['Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/56.0.2924.76 Chrome/56.0.2924.76 Safari/537.36'],
+            ['Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome Safari/537.36'],
+        ];
     }
 
     public function testHeadersOverflow()
     {
         $handler = new TestChromePHPHandler();
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::WARNING, str_repeat('a', 150 * 1024)));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Warning, str_repeat('a', 2 * 1024)));
 
         // overflow chrome headers limit
-        $handler->handle($this->getRecord(Logger::WARNING, str_repeat('a', 100 * 1024)));
+        $handler->handle($this->getRecord(Level::Warning, str_repeat('b', 2 * 1024)));
 
-        $expected = array(
-            'X-ChromeLogger-Data'   => base64_encode(utf8_encode(json_encode(array(
-                'version' => ChromePHPHandler::VERSION,
-                'columns' => array('label', 'log', 'backtrace', 'type'),
-                'rows' => array(
-                    array(
+        $expected = [
+            'X-ChromeLogger-Data'   => base64_encode(json_encode([
+                'version' => '4.0',
+                'columns' => ['label', 'log', 'backtrace', 'type'],
+                'rows' => [
+                    [
                         'test',
                         'test',
                         'unknown',
                         'log',
-                    ),
-                    array(
+                    ],
+                    [
                         'test',
-                        str_repeat('a', 150 * 1024),
+                        str_repeat('a', 2 * 1024),
                         'unknown',
                         'warn',
-                    ),
-                    array(
+                    ],
+                    [
                         'monolog',
                         'Incomplete logs, chrome header size limit reached',
                         'unknown',
                         'warn',
-                    ),
-                ),
+                    ],
+                ],
                 'request_uri' => '',
-            )))),
-        );
+            ])),
+        ];
 
         $this->assertEquals($expected, $handler->getHeaders());
     }
@@ -106,27 +104,27 @@ class ChromePHPHandlerTest extends TestCase
     {
         $handler = new TestChromePHPHandler();
         $handler->setFormatter($this->getIdentityFormatter());
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Warning));
 
         $handler2 = new TestChromePHPHandler();
         $handler2->setFormatter($this->getIdentityFormatter());
-        $handler2->handle($this->getRecord(Logger::DEBUG));
-        $handler2->handle($this->getRecord(Logger::WARNING));
+        $handler2->handle($this->getRecord(Level::Debug));
+        $handler2->handle($this->getRecord(Level::Warning));
 
-        $expected = array(
-            'X-ChromeLogger-Data'   => base64_encode(utf8_encode(json_encode(array(
-                'version' => ChromePHPHandler::VERSION,
-                'columns' => array('label', 'log', 'backtrace', 'type'),
-                'rows' => array(
+        $expected = [
+            'X-ChromeLogger-Data'   => base64_encode(json_encode([
+                'version' => '4.0',
+                'columns' => ['label', 'log', 'backtrace', 'type'],
+                'rows' => [
                     'test',
                     'test',
                     'test',
                     'test',
-                ),
+                ],
                 'request_uri' => '',
-            )))),
-        );
+            ])),
+        ];
 
         $this->assertEquals($expected, $handler2->getHeaders());
     }
@@ -134,23 +132,28 @@ class ChromePHPHandlerTest extends TestCase
 
 class TestChromePHPHandler extends ChromePHPHandler
 {
-    protected $headers = array();
+    protected array $headers = [];
 
-    public static function resetStatic()
+    public static function resetStatic(): void
     {
         self::$initialized = false;
         self::$overflowed = false;
         self::$sendHeaders = true;
-        self::$json['rows'] = array();
+        self::$json['rows'] = [];
     }
 
-    protected function sendHeader($header, $content)
+    protected function sendHeader(string $header, string $content): void
     {
         $this->headers[$header] = $content;
     }
 
-    public function getHeaders()
+    public function getHeaders(): array
     {
         return $this->headers;
+    }
+
+    protected function isWebRequest(): bool
+    {
+        return true;
     }
 }

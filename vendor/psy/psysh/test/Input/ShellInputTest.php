@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2018 Justin Hileman
+ * (c) 2012-2026 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -13,18 +13,18 @@ namespace Psy\Test\Input;
 
 use Psy\Input\CodeArgument;
 use Psy\Input\ShellInput;
+use Psy\Test\TestCase;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
-class ShellInputTest extends \PHPUnit\Framework\TestCase
+class ShellInputTest extends TestCase
 {
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage Unexpected CodeArgument before the final position: a
-     */
     public function testThrowsWhenCodeArgumentNotInFinalPosition()
     {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unexpected CodeArgument before the final position: a');
+
         $definition = new InputDefinition([
             new CodeArgument('a', null, CodeArgument::REQUIRED),
             new InputArgument('b', null, InputArgument::REQUIRED),
@@ -32,6 +32,8 @@ class ShellInputTest extends \PHPUnit\Framework\TestCase
 
         $input = new ShellInput('foo bar');
         $input->bind($definition);
+
+        $this->fail();
     }
 
     public function testInputOptionWithGivenString()
@@ -95,9 +97,11 @@ class ShellInputTest extends \PHPUnit\Framework\TestCase
     public function testTokenize($input, $tokens, $message)
     {
         $input = new ShellInput($input);
-        $r = new \ReflectionClass('Psy\Input\ShellInput');
+        $r = new \ReflectionClass(ShellInput::class);
         $p = $r->getProperty('tokenPairs');
-        $p->setAccessible(true);
+        if (\PHP_VERSION_ID < 80100) {
+            $p->setAccessible(true);
+        }
         $this->assertSame($tokens, $p->getValue($input), $message);
     }
 

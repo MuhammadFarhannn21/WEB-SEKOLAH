@@ -23,13 +23,17 @@ namespace Mockery\Tests;
 
 use Mockery\Adapter\Phpunit\MockeryTestCase;
 
-class GeneratorTest extends MockeryTestCase
+class MockeryCanMockMultipleInterfacesWhichOverlapTest extends MockeryTestCase
 {
     /** @test */
     public function shouldNotDuplicateDoublyInheritedMethods()
     {
-        $container = new \Mockery\Container;
-        $mock = $container->mock('Mockery\Tests\Evenement_EventEmitter', 'Mockery\Tests\Chatroulette_ConnectionInterface');
+        $container = new \Mockery\Container();
+        $mock = $container->mock(
+            'Mockery\Tests\Evenement_EventEmitter',
+            'Mockery\Tests\Chatroulette_ConnectionInterface'
+        );
+        self::assertInstanceOf(\Mockery\Tests\Evenement_EventEmitter::class, $mock);
     }
 }
 

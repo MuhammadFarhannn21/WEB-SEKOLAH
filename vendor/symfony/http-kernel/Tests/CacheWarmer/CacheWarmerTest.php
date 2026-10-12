@@ -16,14 +16,14 @@ use Symfony\Component\HttpKernel\CacheWarmer\CacheWarmer;
 
 class CacheWarmerTest extends TestCase
 {
-    protected static $cacheFile;
+    protected static string $cacheFile;
 
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
         self::$cacheFile = tempnam(sys_get_temp_dir(), 'sf_cache_warmer_dir');
     }
 
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
         @unlink(self::$cacheFile);
     }
@@ -36,11 +36,9 @@ class CacheWarmerTest extends TestCase
         $this->assertFileExists(self::$cacheFile);
     }
 
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testWriteNonWritableCacheFileThrowsARuntimeException()
     {
+        $this->expectException(\RuntimeException::class);
         $nonWritableFile = '/this/file/is/very/probably/not/writable';
         $warmer = new TestCacheWarmer($nonWritableFile);
         $warmer->warmUp(\dirname($nonWritableFile));
@@ -49,19 +47,21 @@ class CacheWarmerTest extends TestCase
 
 class TestCacheWarmer extends CacheWarmer
 {
-    protected $file;
+    protected string $file;
 
-    public function __construct($file)
+    public function __construct(string $file)
     {
         $this->file = $file;
     }
 
-    public function warmUp($cacheDir)
+    public function warmUp(string $cacheDir, ?string $buildDir = null): array
     {
         $this->writeCacheFile($this->file, 'content');
+
+        return [];
     }
 
-    public function isOptional()
+    public function isOptional(): bool
     {
         return false;
     }

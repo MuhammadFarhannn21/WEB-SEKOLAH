@@ -1,10 +1,15 @@
 <?php
 namespace Hamcrest;
 
-class MatcherAssertTest extends \PhpUnit_Framework_TestCase
+use PHPUnit\Framework\TestCase;
+
+class MatcherAssertTest extends TestCase
 {
 
-    protected function setUp()
+    /**
+     * @before
+     */
+    protected function setUpTest()
     {
         \Hamcrest\MatcherAssert::resetCount();
     }

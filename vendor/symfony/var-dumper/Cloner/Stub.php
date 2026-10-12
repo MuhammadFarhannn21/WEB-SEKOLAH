@@ -18,43 +18,59 @@ namespace Symfony\Component\VarDumper\Cloner;
  */
 class Stub
 {
-    const TYPE_REF = 1;
-    const TYPE_STRING = 2;
-    const TYPE_ARRAY = 3;
-    const TYPE_OBJECT = 4;
-    const TYPE_RESOURCE = 5;
+    public const TYPE_REF = 1;
+    public const TYPE_STRING = 2;
+    public const TYPE_ARRAY = 3;
+    public const TYPE_OBJECT = 4;
+    public const TYPE_RESOURCE = 5;
+    public const TYPE_SCALAR = 6;
 
-    const STRING_BINARY = 1;
-    const STRING_UTF8 = 2;
+    public const STRING_BINARY = 1;
+    public const STRING_UTF8 = 2;
 
-    const ARRAY_ASSOC = 1;
-    const ARRAY_INDEXED = 2;
+    public const ARRAY_ASSOC = 1;
+    public const ARRAY_INDEXED = 2;
 
-    public $type = self::TYPE_REF;
-    public $class = '';
-    public $value;
-    public $cut = 0;
-    public $handle = 0;
-    public $refCount = 0;
-    public $position = 0;
-    public $attr = [];
-
-    /**
-     * @internal
-     */
-    public function __sleep()
-    {
-        $this->serialized = [$this->class, $this->position, $this->cut, $this->type, $this->value, $this->handle, $this->refCount, $this->attr];
-
-        return ['serialized'];
-    }
+    public int $type = self::TYPE_REF;
+    public string|int|null $class = '';
+    public mixed $value = null;
+    public int $cut = 0;
+    public int $handle = 0;
+    public int $refCount = 0;
+    public int $position = 0;
+    public array $attr = [];
 
     /**
      * @internal
      */
-    public function __wakeup()
+    protected static array $propertyDefaults = [];
+
+    public function __serialize(): array
     {
-        list($this->class, $this->position, $this->cut, $this->type, $this->value, $this->handle, $this->refCount, $this->attr) = $this->serialized;
-        unset($this->serialized);
+        static $noDefault = new \stdClass();
+
+        if (self::class === static::class) {
+            $data = [];
+            foreach ($this as $k => $v) {
+                $default = self::$propertyDefaults[$this::class][$k] ??= ($p = new \ReflectionProperty($this, $k))->hasDefaultValue() ? $p->getDefaultValue() : ($p->hasType() ? $noDefault : null);
+                if ($noDefault === $default || $default !== $v) {
+                    $data[$k] = $v;
+                }
+            }
+
+            return $data;
+        }
+
+        return \Closure::bind(function () use ($noDefault) {
+            $data = [];
+            foreach ($this as $k => $v) {
+                $default = self::$propertyDefaults[$this::class][$k] ??= ($p = new \ReflectionProperty($this, $k))->hasDefaultValue() ? $p->getDefaultValue() : ($p->hasType() ? $noDefault : null);
+                if ($noDefault === $default || $default !== $v) {
+                    $data[$k] = $v;
+                }
+            }
+
+            return $data;
+        }, $this, $this::class)();
     }
 }

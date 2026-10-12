@@ -19,29 +19,13 @@ use Symfony\Component\EventDispatcher\GenericEvent;
  */
 class GenericEventTest extends TestCase
 {
-    /**
-     * @var GenericEvent
-     */
-    private $event;
+    private GenericEvent $event;
+    private \stdClass $subject;
 
-    private $subject;
-
-    /**
-     * Prepares the environment before running a test.
-     */
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->subject = new \stdClass();
         $this->event = new GenericEvent($this->subject, ['name' => 'Event']);
-    }
-
-    /**
-     * Cleans up the environment after running a test.
-     */
-    protected function tearDown()
-    {
-        $this->subject = null;
-        $this->event = null;
     }
 
     public function testConstruct()
@@ -61,14 +45,14 @@ class GenericEventTest extends TestCase
     public function testSetArguments()
     {
         $result = $this->event->setArguments(['foo' => 'bar']);
-        $this->assertAttributeSame(['foo' => 'bar'], 'arguments', $this->event);
+        $this->assertSame(['foo' => 'bar'], $this->event->getArguments());
         $this->assertSame($this->event, $result);
     }
 
     public function testSetArgument()
     {
         $result = $this->event->setArgument('foo2', 'bar2');
-        $this->assertAttributeSame(['name' => 'Event', 'foo2' => 'bar2'], 'arguments', $this->event);
+        $this->assertSame(['name' => 'Event', 'foo2' => 'bar2'], $this->event->getArguments());
         $this->assertEquals($this->event, $result);
     }
 
@@ -78,11 +62,9 @@ class GenericEventTest extends TestCase
         $this->assertEquals('Event', $this->event->getArgument('name'));
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     */
     public function testGetArgException()
     {
+        $this->expectException(\InvalidArgumentException::class);
         $this->event->getArgument('nameNotExist');
     }
 
@@ -92,20 +74,20 @@ class GenericEventTest extends TestCase
         $this->assertEquals('Event', $this->event['name']);
 
         // test getting invalid arg
-        $this->{method_exists($this, $_ = 'expectException') ? $_ : 'setExpectedException'}('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         $this->assertFalse($this->event['nameNotExist']);
     }
 
     public function testOffsetSet()
     {
         $this->event['foo2'] = 'bar2';
-        $this->assertAttributeSame(['name' => 'Event', 'foo2' => 'bar2'], 'arguments', $this->event);
+        $this->assertSame(['name' => 'Event', 'foo2' => 'bar2'], $this->event->getArguments());
     }
 
     public function testOffsetUnset()
     {
         unset($this->event['name']);
-        $this->assertAttributeSame([], 'arguments', $this->event);
+        $this->assertSame([], $this->event->getArguments());
     }
 
     public function testOffsetIsset()

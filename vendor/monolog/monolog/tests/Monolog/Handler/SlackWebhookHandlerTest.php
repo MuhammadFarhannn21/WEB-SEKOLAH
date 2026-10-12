@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,8 +11,7 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\Slack\SlackRecord;
 
@@ -21,7 +20,7 @@ use Monolog\Handler\Slack\SlackRecord;
  * @see    https://api.slack.com/incoming-webhooks
  * @coversDefaultClass Monolog\Handler\SlackWebhookHandler
  */
-class SlackWebhookHandlerTest extends TestCase
+class SlackWebhookHandlerTest extends \Monolog\Test\MonologTestCase
 {
     const WEBHOOK_URL = 'https://hooks.slack.com/services/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E';
 
@@ -35,25 +34,27 @@ class SlackWebhookHandlerTest extends TestCase
         $record = $this->getRecord();
         $slackRecord = $handler->getSlackRecord();
         $this->assertInstanceOf('Monolog\Handler\Slack\SlackRecord', $slackRecord);
-        $this->assertEquals(array(
-            'attachments' => array(
-                array(
+        $this->assertEquals([
+            'attachments' => [
+                [
                     'fallback' => 'test',
                     'text' => 'test',
                     'color' => SlackRecord::COLOR_WARNING,
-                    'fields' => array(
-                        array(
+                    'fields' => [
+                        [
                             'title' => 'Level',
                             'value' => 'WARNING',
                             'short' => false,
-                        ),
-                    ),
+                        ],
+                    ],
                     'title' => 'Message',
-                    'mrkdwn_in' => array('fields'),
-                    'ts' => $record['datetime']->getTimestamp(),
-                ),
-            ),
-        ), $slackRecord->getSlackData($record));
+                    'mrkdwn_in' => ['fields'],
+                    'ts' => $record->datetime->getTimestamp(),
+                    'footer' => null,
+                    'footer_icon' => null,
+                ],
+            ],
+        ], $slackRecord->getSlackData($record));
     }
 
     /**
@@ -70,18 +71,65 @@ class SlackWebhookHandlerTest extends TestCase
             ':ghost:',
             false,
             false,
-            Logger::DEBUG,
+            Level::Debug,
             false
         );
 
         $slackRecord = $handler->getSlackRecord();
         $this->assertInstanceOf('Monolog\Handler\Slack\SlackRecord', $slackRecord);
-        $this->assertEquals(array(
+        $this->assertEquals([
             'username' => 'test-username',
             'text' => 'test',
             'channel' => 'test-channel',
             'icon_emoji' => ':ghost:',
-        ), $slackRecord->getSlackData($this->getRecord()));
+        ], $slackRecord->getSlackData($this->getRecord()));
+    }
+
+    /**
+     * @covers ::__construct
+     * @covers ::getSlackRecord
+     */
+    public function testConstructorFullWithAttachment()
+    {
+        $handler = new SlackWebhookHandler(
+            self::WEBHOOK_URL,
+            'test-channel-with-attachment',
+            'test-username-with-attachment',
+            true,
+            'https://www.example.com/example.png',
+            false,
+            false,
+            Level::Debug,
+            false
+        );
+
+        $record = $this->getRecord();
+        $slackRecord = $handler->getSlackRecord();
+        $this->assertInstanceOf('Monolog\Handler\Slack\SlackRecord', $slackRecord);
+        $this->assertEquals([
+            'username' => 'test-username-with-attachment',
+            'channel' => 'test-channel-with-attachment',
+            'attachments' => [
+                [
+                    'fallback' => 'test',
+                    'text' => 'test',
+                    'color' => SlackRecord::COLOR_WARNING,
+                    'fields' => [
+                        [
+                            'title' => 'Level',
+                            'value' => Level::Warning->getName(),
+                            'short' => false,
+                        ],
+                    ],
+                    'mrkdwn_in' => ['fields'],
+                    'ts' => $record['datetime']->getTimestamp(),
+                    'footer' => 'test-username-with-attachment',
+                    'footer_icon' => 'https://www.example.com/example.png',
+                    'title' => 'Message',
+                ],
+            ],
+            'icon_url' => 'https://www.example.com/example.png',
+        ], $slackRecord->getSlackData($record));
     }
 
     /**

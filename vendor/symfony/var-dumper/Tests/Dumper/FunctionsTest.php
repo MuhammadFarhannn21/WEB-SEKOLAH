@@ -18,6 +18,17 @@ use Symfony\Component\VarDumper\VarDumper;
 
 class FunctionsTest extends TestCase
 {
+    public function testDumpWithoutArg()
+    {
+        $this->setupVarDumper();
+
+        ob_start();
+        $return = dump();
+        ob_end_clean();
+
+        $this->assertNull($return);
+    }
+
     public function testDumpReturnsFirstArg()
     {
         $this->setupVarDumper();
@@ -26,9 +37,22 @@ class FunctionsTest extends TestCase
 
         ob_start();
         $return = dump($var1);
-        $out = ob_get_clean();
+        ob_end_clean();
 
-        $this->assertEquals($var1, $return);
+        $this->assertSame($var1, $return);
+    }
+
+    public function testDumpReturnsFirstNamedArgWithoutSectionName()
+    {
+        $this->setupVarDumper();
+
+        $var1 = 'a';
+
+        ob_start();
+        $return = dump(first: $var1);
+        ob_end_clean();
+
+        $this->assertSame($var1, $return);
     }
 
     public function testDumpReturnsAllArgsInArray()
@@ -41,9 +65,24 @@ class FunctionsTest extends TestCase
 
         ob_start();
         $return = dump($var1, $var2, $var3);
-        $out = ob_get_clean();
+        ob_end_clean();
 
-        $this->assertEquals([$var1, $var2, $var3], $return);
+        $this->assertSame([$var1, $var2, $var3], $return);
+    }
+
+    public function testDumpReturnsAllNamedArgsInArray()
+    {
+        $this->setupVarDumper();
+
+        $var1 = 'a';
+        $var2 = 'b';
+        $var3 = 'c';
+
+        ob_start();
+        $return = dump($var1, second: $var2, third: $var3);
+        ob_end_clean();
+
+        $this->assertSame([$var1, 'second' => $var2, 'third' => $var3], $return);
     }
 
     protected function setupVarDumper()

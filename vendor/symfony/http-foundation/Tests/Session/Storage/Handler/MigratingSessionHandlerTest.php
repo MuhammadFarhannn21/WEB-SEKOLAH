@@ -16,54 +16,52 @@ use Symfony\Component\HttpFoundation\Session\Storage\Handler\MigratingSessionHan
 
 class MigratingSessionHandlerTest extends TestCase
 {
-    private $dualHandler;
-    private $currentHandler;
-    private $writeOnlyHandler;
-
-    protected function setUp()
-    {
-        $this->currentHandler = $this->createMock(\SessionHandlerInterface::class);
-        $this->writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
-
-        $this->dualHandler = new MigratingSessionHandler($this->currentHandler, $this->writeOnlyHandler);
-    }
-
     public function testInstanceOf()
     {
-        $this->assertInstanceOf(\SessionHandlerInterface::class, $this->dualHandler);
-        $this->assertInstanceOf(\SessionUpdateTimestampHandlerInterface::class, $this->dualHandler);
+        $dualHandler = new MigratingSessionHandler($this->createStub(\SessionHandlerInterface::class), $this->createStub(\SessionHandlerInterface::class));
+
+        $this->assertInstanceOf(\SessionHandlerInterface::class, $dualHandler);
+        $this->assertInstanceOf(\SessionUpdateTimestampHandlerInterface::class, $dualHandler);
     }
 
     public function testClose()
     {
-        $this->currentHandler->expects($this->once())
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $currentHandler->expects($this->once())
             ->method('close')
-            ->will($this->returnValue(true));
+            ->willReturn(true);
 
-        $this->writeOnlyHandler->expects($this->once())
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler->expects($this->once())
             ->method('close')
-            ->will($this->returnValue(false));
+            ->willReturn(false);
 
-        $result = $this->dualHandler->close();
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $result = $dualHandler->close();
 
         $this->assertTrue($result);
     }
 
     public function testDestroy()
     {
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $dualHandler->open('/path/to/save/location', 'xyz');
+
         $sessionId = 'xyz';
 
-        $this->currentHandler->expects($this->once())
+        $currentHandler->expects($this->once())
             ->method('destroy')
             ->with($sessionId)
-            ->will($this->returnValue(true));
+            ->willReturn(true);
 
-        $this->writeOnlyHandler->expects($this->once())
+        $writeOnlyHandler->expects($this->once())
             ->method('destroy')
             ->with($sessionId)
-            ->will($this->returnValue(false));
+            ->willReturn(false);
 
-        $result = $this->dualHandler->destroy($sessionId);
+        $result = $dualHandler->destroy($sessionId);
 
         $this->assertTrue($result);
     }
@@ -72,18 +70,20 @@ class MigratingSessionHandlerTest extends TestCase
     {
         $maxlifetime = 357;
 
-        $this->currentHandler->expects($this->once())
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $currentHandler->expects($this->once())
             ->method('gc')
             ->with($maxlifetime)
-            ->will($this->returnValue(true));
+            ->willReturn(1);
 
-        $this->writeOnlyHandler->expects($this->once())
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler->expects($this->once())
             ->method('gc')
             ->with($maxlifetime)
-            ->will($this->returnValue(false));
+            ->willReturn(false);
 
-        $result = $this->dualHandler->gc($maxlifetime);
-        $this->assertTrue($result);
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $this->assertSame(1, $dualHandler->gc($maxlifetime));
     }
 
     public function testOpen()
@@ -91,17 +91,20 @@ class MigratingSessionHandlerTest extends TestCase
         $savePath = '/path/to/save/location';
         $sessionName = 'xyz';
 
-        $this->currentHandler->expects($this->once())
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $currentHandler->expects($this->once())
             ->method('open')
             ->with($savePath, $sessionName)
-            ->will($this->returnValue(true));
+            ->willReturn(true);
 
-        $this->writeOnlyHandler->expects($this->once())
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler->expects($this->once())
             ->method('open')
             ->with($savePath, $sessionName)
-            ->will($this->returnValue(false));
+            ->willReturn(false);
 
-        $result = $this->dualHandler->open($savePath, $sessionName);
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $result = $dualHandler->open($savePath, $sessionName);
 
         $this->assertTrue($result);
     }
@@ -111,16 +114,18 @@ class MigratingSessionHandlerTest extends TestCase
         $sessionId = 'xyz';
         $readValue = 'something';
 
-        $this->currentHandler->expects($this->once())
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $currentHandler->expects($this->once())
             ->method('read')
             ->with($sessionId)
-            ->will($this->returnValue($readValue));
+            ->willReturn($readValue);
 
-        $this->writeOnlyHandler->expects($this->never())
-            ->method('read')
-            ->with($this->any());
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler->expects($this->never())
+            ->method('read');
 
-        $result = $this->dualHandler->read($sessionId);
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $result = $dualHandler->read($sessionId);
 
         $this->assertSame($readValue, $result);
     }
@@ -130,17 +135,20 @@ class MigratingSessionHandlerTest extends TestCase
         $sessionId = 'xyz';
         $data = 'my-serialized-data';
 
-        $this->currentHandler->expects($this->once())
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $currentHandler->expects($this->once())
             ->method('write')
             ->with($sessionId, $data)
-            ->will($this->returnValue(true));
+            ->willReturn(true);
 
-        $this->writeOnlyHandler->expects($this->once())
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler->expects($this->once())
             ->method('write')
             ->with($sessionId, $data)
-            ->will($this->returnValue(false));
+            ->willReturn(false);
 
-        $result = $this->dualHandler->write($sessionId, $data);
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $result = $dualHandler->write($sessionId, $data);
 
         $this->assertTrue($result);
     }
@@ -150,16 +158,18 @@ class MigratingSessionHandlerTest extends TestCase
         $sessionId = 'xyz';
         $readValue = 'something';
 
-        $this->currentHandler->expects($this->once())
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $currentHandler->expects($this->once())
             ->method('read')
             ->with($sessionId)
-            ->will($this->returnValue($readValue));
+            ->willReturn($readValue);
 
-        $this->writeOnlyHandler->expects($this->never())
-            ->method('read')
-            ->with($this->any());
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler->expects($this->never())
+            ->method('read');
 
-        $result = $this->dualHandler->validateId($sessionId);
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $result = $dualHandler->validateId($sessionId);
 
         $this->assertTrue($result);
     }
@@ -169,17 +179,20 @@ class MigratingSessionHandlerTest extends TestCase
         $sessionId = 'xyz';
         $data = 'my-serialized-data';
 
-        $this->currentHandler->expects($this->once())
+        $currentHandler = $this->createMock(\SessionHandlerInterface::class);
+        $currentHandler->expects($this->once())
             ->method('write')
             ->with($sessionId, $data)
-            ->will($this->returnValue(true));
+            ->willReturn(true);
 
-        $this->writeOnlyHandler->expects($this->once())
+        $writeOnlyHandler = $this->createMock(\SessionHandlerInterface::class);
+        $writeOnlyHandler->expects($this->once())
             ->method('write')
             ->with($sessionId, $data)
-            ->will($this->returnValue(false));
+            ->willReturn(false);
 
-        $result = $this->dualHandler->updateTimestamp($sessionId, $data);
+        $dualHandler = new MigratingSessionHandler($currentHandler, $writeOnlyHandler);
+        $result = $dualHandler->updateTimestamp($sessionId, $data);
 
         $this->assertTrue($result);
     }

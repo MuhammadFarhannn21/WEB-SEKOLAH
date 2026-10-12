@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2018 Justin Hileman
+ * (c) 2012-2026 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -13,7 +13,7 @@ namespace Psy\Test;
 
 use Psy\CodeCleaner;
 
-class CodeCleanerTest extends \PHPUnit\Framework\TestCase
+class CodeCleanerTest extends TestCase
 {
     /**
      * @dataProvider semicolonCodeProvider
@@ -43,7 +43,7 @@ class CodeCleanerTest extends \PHPUnit\Framework\TestCase
      */
     public function testUnclosedStatements(array $lines, $isUnclosed)
     {
-        $cc  = new CodeCleaner();
+        $cc = new CodeCleaner();
         $res = $cc->clean($lines);
 
         if ($isUnclosed) {
@@ -79,11 +79,7 @@ class CodeCleanerTest extends \PHPUnit\Framework\TestCase
      */
     public function testMoreUnclosedStatements(array $lines)
     {
-        if (\defined('HHVM_VERSION')) {
-            $this->markTestSkipped('HHVM not supported.');
-        }
-
-        $cc  = new CodeCleaner();
+        $cc = new CodeCleaner();
         $res = $cc->clean($lines);
 
         $this->assertFalse($res);
@@ -102,20 +98,19 @@ class CodeCleanerTest extends \PHPUnit\Framework\TestCase
 
     /**
      * @dataProvider invalidStatementsProvider
-     * @expectedException \Psy\Exception\ParseErrorException
      */
     public function testInvalidStatementsThrowParseErrors($code)
     {
+        $this->expectException(\Psy\Exception\ParseErrorException::class);
+
         $cc = new CodeCleaner();
         $cc->clean([$code]);
+
+        $this->fail();
     }
 
     public function invalidStatementsProvider()
     {
-        // n.b. We used to check that `var_dump(1,2,)` failed, but PHP Parser
-        // 4.x backported trailing comma function calls from PHP 7.3 for free!
-        // so we're not going to spend too much time worrying about it :)
-
         return [
             ['function "what'],
             ["function 'what"],
@@ -127,5 +122,67 @@ class CodeCleanerTest extends \PHPUnit\Framework\TestCase
             ['$foo "bar'],
             ['$foo \'bar'],
         ];
+    }
+
+    public function testNamespaceReEntryResetsUseStatements()
+    {
+        $cc = new CodeCleaner();
+
+        // Enter namespace A and add a use statement
+        $cc->clean(['namespace A;']);
+        $cc->clean(['use StdClass as Foo;']);
+
+        // Re-enter namespace A - should clear previous use statements
+        $cc->clean(['namespace A;']);
+
+        // Should be able to use same alias for a different class
+        $result = $cc->clean(['use DateTime as Foo;']);
+        $this->assertNotFalse($result);
+        $this->assertStringContainsString('DateTime', $result);
+    }
+
+    public function testGlobalNamespaceReEntryResetsUseStatements()
+    {
+        $cc = new CodeCleaner();
+
+        // Add use statement in global namespace
+        $cc->clean(['use StdClass as Bar;']);
+
+        // Enter braced global namespace - should clear previous use statements
+        $cc->clean(['namespace {}']);
+
+        // Should be able to use same alias for a different class
+        $result = $cc->clean(['use DateTime as Bar;']);
+        $this->assertNotFalse($result);
+        $this->assertStringContainsString('DateTime', $result);
+    }
+
+    public function testUseStatementsPersistWithinNamespace()
+    {
+        $cc = new CodeCleaner();
+
+        // Enter namespace and add use statement
+        $cc->clean(['namespace Foo;']);
+        $cc->clean(['use StdClass as Bar;']);
+
+        // Execute code without namespace declaration - use statement should persist
+        // and code should be wrapped in the namespace
+        $result = $cc->clean(['$x = new Bar();']);
+        $this->assertNotFalse($result);
+        $this->assertStringContainsString('namespace Foo', $result);
+
+        // The use statement should persist for resolveClassName
+        $resolved = $cc->resolveClassName('Bar');
+        $this->assertSame('\\StdClass', $resolved);
+    }
+
+    public function testThrowExpressionDoesNotGetWrappedInReturn()
+    {
+        $cc = new CodeCleaner();
+
+        $this->assertSame(
+            "throw new Exception('wat');",
+            $cc->clean(["throw new Exception('wat')"])
+        );
     }
 }

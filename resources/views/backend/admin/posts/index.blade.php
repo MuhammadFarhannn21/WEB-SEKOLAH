@@ -46,9 +46,9 @@
                             <td><img src="{{ asset($post->featured)}}" width="30px" height="30px"> </td>
                             <td>{!! substr($post->title, 0, 10) !!}</td>
                             <td>{{ $post->jenis}}</td>
-                            <td>{{ $post->category->title}}</td>
+                            <td>{{ $post->category->title ?? 'Tanpa Kategori' }}</td>
                             <td>{{ $post->status == 1 ? "Publish" : "Draft"}}</td>
-                            <td>{{ $post->user->name}}</td>
+                            <td>{{ $post->user->name ?? 'Admin' }}</td>
                             <?php $tanggal=date_create($post->published_at); ?> 
                             <td>{{ date_format($tanggal,"d F Y")}}</td>
                             

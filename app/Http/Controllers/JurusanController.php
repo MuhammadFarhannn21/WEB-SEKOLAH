@@ -29,15 +29,15 @@ class JurusanController extends Controller
 
     public function store(Request $request)
     {
-        $this->validate($request, [
-            'keterangan'    => 'required|min:20',
-            'sub_judul'     => 'required|max:50',
-        ]);
-
-        Jurusan::create($request->all());
-        LogAktivity::addToLog(Auth::user()->name.' Membuat Jurusan '.$request['judul']);
-        toast('Berhasil Membuat Jurusan','success','top-right');
-        return redirect()->back();
+    $this->validate($request, [
+        'judul'      => 'required',
+        'sub_judul'  => 'required',
+        'keterangan' => 'required',
+    ]);
+    Jurusan::create($request->all());
+    LogAktivity::addToLog(Auth::user()->name.' Membuat Jurusan '.$request['judul']);
+    toast('Berhasil Membuat Jurusan','success','top-right');
+    return redirect()->back();
     }
 
     // bagian edit data
@@ -47,13 +47,19 @@ class JurusanController extends Controller
     }
 
     // bagian update data
-    public function update(Request $request,$id){
-        $jurusan = Jurusan::findOrFail($id);
-        $jurusan->update($request->all());
-        LogAktivity::addToLog(Auth::user()->name.' Mengupdate jurusan '.$jurusan->judul);
-        toast('Berhasil Mengupdate Data','success','top-right');
-        return redirect()->back();
-    }
+    public function update(Request $request, $id)
+{
+    $jurusan = Jurusan::findOrFail($id);
+    $this->validate($request, [
+        'judul'      => 'required',
+        'sub_judul'  => 'required',
+        'keterangan' => 'required',
+    ]);
+    $jurusan->update($request->all());
+    LogAktivity::addToLog(Auth::user()->name.' Mengupdate jurusan '.$jurusan->judul);
+    toast('Berhasil Mengupdate Data','success','top-right');
+    return redirect()->back();
+}
 
     // bagian menghapus data
     public function delete($id){

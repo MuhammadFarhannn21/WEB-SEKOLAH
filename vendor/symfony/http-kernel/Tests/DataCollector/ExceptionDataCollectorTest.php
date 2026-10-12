@@ -12,7 +12,7 @@
 namespace Symfony\Component\HttpKernel\Tests\DataCollector;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Debug\Exception\FlattenException;
+use Symfony\Component\ErrorHandler\Exception\FlattenException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\DataCollector\ExceptionDataCollector;
@@ -23,7 +23,7 @@ class ExceptionDataCollectorTest extends TestCase
     {
         $e = new \Exception('foo', 500);
         $c = new ExceptionDataCollector();
-        $flattened = FlattenException::create($e);
+        $flattened = FlattenException::createWithDataRepresentation($e);
         $trace = $flattened->getTrace();
 
         $this->assertFalse($c->hasException());
@@ -36,6 +36,12 @@ class ExceptionDataCollectorTest extends TestCase
         $this->assertSame(500, $c->getCode());
         $this->assertSame('exception', $c->getName());
         $this->assertSame($trace, $c->getTrace());
+
+        $c->collect(new Request(), new Response(), new class extends \Exception {
+            protected $code = 'non-integer-code';
+        });
+
+        $this->assertSame('non-integer-code', $c->getCode());
     }
 
     public function testCollectWithoutException()

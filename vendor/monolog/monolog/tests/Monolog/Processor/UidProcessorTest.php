@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,9 +11,7 @@
 
 namespace Monolog\Processor;
 
-use Monolog\TestCase;
-
-class UidProcessorTest extends TestCase
+class UidProcessorTest extends \Monolog\Test\MonologTestCase
 {
     /**
      * @covers Monolog\Processor\UidProcessor::__invoke
@@ -22,12 +20,12 @@ class UidProcessorTest extends TestCase
     {
         $processor = new UidProcessor();
         $record = $processor($this->getRecord());
-        $this->assertArrayHasKey('uid', $record['extra']);
+        $this->assertArrayHasKey('uid', $record->extra);
     }
 
     public function testGetUid()
     {
         $processor = new UidProcessor(10);
-        $this->assertEquals(10, strlen($processor->getUid()));
+        $this->assertEquals(10, \strlen($processor->getUid()));
     }
 }

@@ -7,38 +7,60 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-
 namespace SebastianBergmann\Diff;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Small;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers SebastianBergmann\Diff\Line
- */
+#[CoversClass(Line::class)]
+#[Small]
 final class LineTest extends TestCase
 {
-    /**
-     * @var Line
-     */
-    private $line;
-
-    protected function setUp(): void
+    public function testCanBeOfTypeAdded(): void
     {
-        $this->line = new Line;
+        $this->assertSame(Line::ADDED, $this->added()->type());
+
+        $this->assertTrue($this->added()->isAdded());
+        $this->assertFalse($this->added()->isRemoved());
+        $this->assertFalse($this->added()->isUnchanged());
     }
 
-    public function testCanBeCreatedWithoutArguments(): void
+    public function testCanBeOfTypeRemoved(): void
     {
-        $this->assertInstanceOf(Line::class, $this->line);
+        $this->assertSame(Line::REMOVED, $this->removed()->type());
+
+        $this->assertTrue($this->removed()->isRemoved());
+        $this->assertFalse($this->removed()->isAdded());
+        $this->assertFalse($this->removed()->isUnchanged());
     }
 
-    public function testTypeCanBeRetrieved(): void
+    public function testCanBeOfTypeUnchanged(): void
     {
-        $this->assertSame(Line::UNCHANGED, $this->line->getType());
+        $this->assertSame(Line::UNCHANGED, $this->unchanged()->type());
+
+        $this->assertTrue($this->unchanged()->isUnchanged());
+        $this->assertFalse($this->unchanged()->isAdded());
+        $this->assertFalse($this->unchanged()->isRemoved());
     }
 
-    public function testContentCanBeRetrieved(): void
+    public function testHasContent(): void
     {
-        $this->assertSame('', $this->line->getContent());
+        $this->assertSame('content', $this->added()->content());
+    }
+
+    private function added(): Line
+    {
+        return new Line(Line::ADDED, 'content');
+    }
+
+    private function removed(): Line
+    {
+        return new Line(Line::REMOVED, 'content');
+    }
+
+    private function unchanged(): Line
+    {
+        return new Line(Line::UNCHANGED, 'content');
     }
 }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,9 +11,9 @@
 
 namespace Monolog\Processor;
 
-use Monolog\TestCase;
+use Monolog\Level;
 
-class GitProcessorTest extends TestCase
+class GitProcessorTest extends \Monolog\Test\MonologTestCase
 {
     /**
      * @covers Monolog\Processor\GitProcessor::__invoke
@@ -23,7 +23,18 @@ class GitProcessorTest extends TestCase
         $processor = new GitProcessor();
         $record = $processor($this->getRecord());
 
-        $this->assertArrayHasKey('git', $record['extra']);
-        $this->assertTrue(!is_array($record['extra']['git']['branch']));
+        $this->assertArrayHasKey('git', $record->extra);
+        $this->assertTrue(!\is_array($record->extra['git']['branch']));
+    }
+
+    /**
+     * @covers Monolog\Processor\GitProcessor::__invoke
+     */
+    public function testProcessorWithLevel()
+    {
+        $processor = new GitProcessor(Level::Error);
+        $record = $processor($this->getRecord());
+
+        $this->assertArrayNotHasKey('git', $record->extra);
     }
 }

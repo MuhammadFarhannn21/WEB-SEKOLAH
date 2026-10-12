@@ -2,20 +2,17 @@
 
 namespace PhpParser\Builder;
 
-use PhpParser\Comment;
-use PhpParser\Node;
+use PhpParser\Modifiers;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
-use PHPUnit\Framework\TestCase;
 
-class TraitUseAdaptationTest extends TestCase
-{
+class TraitUseAdaptationTest extends \PHPUnit\Framework\TestCase {
     protected function createTraitUseAdaptationBuilder($trait, $method) {
         return new TraitUseAdaptation($trait, $method);
     }
 
-    public function testAsMake() {
+    public function testAsMake(): void {
         $builder = $this->createTraitUseAdaptationBuilder(null, 'foo');
 
         $this->assertEquals(
@@ -24,22 +21,22 @@ class TraitUseAdaptationTest extends TestCase
         );
 
         $this->assertEquals(
-            new Stmt\TraitUseAdaptation\Alias(null, 'foo', Class_::MODIFIER_PUBLIC, null),
+            new Stmt\TraitUseAdaptation\Alias(null, 'foo', Modifiers::PUBLIC, null),
             (clone $builder)->makePublic()->getNode()
         );
 
         $this->assertEquals(
-            new Stmt\TraitUseAdaptation\Alias(null, 'foo', Class_::MODIFIER_PROTECTED, null),
+            new Stmt\TraitUseAdaptation\Alias(null, 'foo', Modifiers::PROTECTED, null),
             (clone $builder)->makeProtected()->getNode()
         );
 
         $this->assertEquals(
-            new Stmt\TraitUseAdaptation\Alias(null, 'foo', Class_::MODIFIER_PRIVATE, null),
+            new Stmt\TraitUseAdaptation\Alias(null, 'foo', Modifiers::PRIVATE, null),
             (clone $builder)->makePrivate()->getNode()
         );
     }
 
-    public function testInsteadof() {
+    public function testInsteadof(): void {
         $node = $this->createTraitUseAdaptationBuilder('SomeTrait', 'foo')
             ->insteadof('AnotherTrait')
             ->getNode()
@@ -55,7 +52,7 @@ class TraitUseAdaptationTest extends TestCase
         );
     }
 
-    public function testAsOnNotAlias() {
+    public function testAsOnNotAlias(): void {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Cannot set alias for not alias adaptation buider');
         $this->createTraitUseAdaptationBuilder('Test', 'foo')
@@ -64,7 +61,7 @@ class TraitUseAdaptationTest extends TestCase
         ;
     }
 
-    public function testInsteadofOnNotPrecedence() {
+    public function testInsteadofOnNotPrecedence(): void {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Cannot add overwritten traits for not precedence adaptation buider');
         $this->createTraitUseAdaptationBuilder('Test', 'foo')
@@ -73,7 +70,7 @@ class TraitUseAdaptationTest extends TestCase
         ;
     }
 
-    public function testInsteadofWithoutTrait() {
+    public function testInsteadofWithoutTrait(): void {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Precedence adaptation must have trait');
         $this->createTraitUseAdaptationBuilder(null, 'foo')
@@ -81,7 +78,7 @@ class TraitUseAdaptationTest extends TestCase
         ;
     }
 
-    public function testMakeOnNotAlias() {
+    public function testMakeOnNotAlias(): void {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Cannot set access modifier for not alias adaptation buider');
         $this->createTraitUseAdaptationBuilder('Test', 'foo')
@@ -90,7 +87,7 @@ class TraitUseAdaptationTest extends TestCase
         ;
     }
 
-    public function testMultipleMake() {
+    public function testMultipleMake(): void {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Multiple access type modifiers are not allowed');
         $this->createTraitUseAdaptationBuilder(null, 'foo')
@@ -99,7 +96,7 @@ class TraitUseAdaptationTest extends TestCase
         ;
     }
 
-    public function testUndefinedType() {
+    public function testUndefinedType(): void {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Type of adaptation is not defined');
         $this->createTraitUseAdaptationBuilder(null, 'foo')

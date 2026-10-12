@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,43 +11,43 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * @author Alexey Karapetov <alexey@karapetov.com>
  */
-class HandlerWrapperTest extends TestCase
+class HandlerWrapperTest extends \Monolog\Test\MonologTestCase
 {
-    /**
-     * @var HandlerWrapper
-     */
-    private $wrapper;
+    private HandlerWrapper $wrapper;
 
-    private $handler;
+    private HandlerInterface&MockObject $handler;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
-        $this->handler = $this->getMock('Monolog\\Handler\\HandlerInterface');
+        $this->handler = $this->createMock(HandlerInterface::class);
         $this->wrapper = new HandlerWrapper($this->handler);
     }
 
-    /**
-     * @return array
-     */
-    public function trueFalseDataProvider()
+    public function tearDown(): void
     {
-        return array(
-            array(true),
-            array(false),
-        );
+        parent::tearDown();
+
+        unset($this->wrapper);
+        unset($this->handler);
     }
 
-    /**
-     * @param $result
-     * @dataProvider trueFalseDataProvider
-     */
-    public function testIsHandling($result)
+    public static function trueFalseDataProvider(): array
+    {
+        return [
+            [true],
+            [false],
+        ];
+    }
+
+    #[DataProvider('trueFalseDataProvider')]
+    public function testIsHandling(bool $result)
     {
         $record = $this->getRecord();
         $this->handler->expects($this->once())
@@ -58,11 +58,8 @@ class HandlerWrapperTest extends TestCase
         $this->assertEquals($result, $this->wrapper->isHandling($record));
     }
 
-    /**
-     * @param $result
-     * @dataProvider trueFalseDataProvider
-     */
-    public function testHandle($result)
+    #[DataProvider('trueFalseDataProvider')]
+    public function testHandle(bool $result)
     {
         $record = $this->getRecord();
         $this->handler->expects($this->once())
@@ -73,58 +70,14 @@ class HandlerWrapperTest extends TestCase
         $this->assertEquals($result, $this->wrapper->handle($record));
     }
 
-    /**
-     * @param $result
-     * @dataProvider trueFalseDataProvider
-     */
-    public function testHandleBatch($result)
+    #[DataProvider('trueFalseDataProvider')]
+    public function testHandleBatch(bool $result)
     {
         $records = $this->getMultipleRecords();
         $this->handler->expects($this->once())
             ->method('handleBatch')
-            ->with($records)
-            ->willReturn($result);
+            ->with($records);
 
-        $this->assertEquals($result, $this->wrapper->handleBatch($records));
-    }
-
-    public function testPushProcessor()
-    {
-        $processor = function () {};
-        $this->handler->expects($this->once())
-            ->method('pushProcessor')
-            ->with($processor);
-
-        $this->assertEquals($this->wrapper, $this->wrapper->pushProcessor($processor));
-    }
-
-    public function testPopProcessor()
-    {
-        $processor = function () {};
-        $this->handler->expects($this->once())
-            ->method('popProcessor')
-            ->willReturn($processor);
-
-        $this->assertEquals($processor, $this->wrapper->popProcessor());
-    }
-
-    public function testSetFormatter()
-    {
-        $formatter = $this->getMock('Monolog\\Formatter\\FormatterInterface');
-        $this->handler->expects($this->once())
-            ->method('setFormatter')
-            ->with($formatter);
-
-        $this->assertEquals($this->wrapper, $this->wrapper->setFormatter($formatter));
-    }
-
-    public function testGetFormatter()
-    {
-        $formatter = $this->getMock('Monolog\\Formatter\\FormatterInterface');
-        $this->handler->expects($this->once())
-            ->method('getFormatter')
-            ->willReturn($formatter);
-
-        $this->assertEquals($formatter, $this->wrapper->getFormatter());
+        $this->wrapper->handleBatch($records);
     }
 }

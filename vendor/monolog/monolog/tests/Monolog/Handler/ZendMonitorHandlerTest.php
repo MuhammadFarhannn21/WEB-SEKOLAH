@@ -1,4 +1,5 @@
-<?php
+<?php declare(strict_types=1);
+
 /*
  * This file is part of the Monolog package.
  *
@@ -10,17 +11,20 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-
-class ZendMonitorHandlerTest extends TestCase
+class ZendMonitorHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    protected $zendMonitorHandler;
-
-    public function setUp()
+    public function setUp(): void
     {
-        if (!function_exists('zend_monitor_custom_event')) {
+        if (!\function_exists('zend_monitor_custom_event')) {
             $this->markTestSkipped('ZendServer is not installed');
         }
+    }
+
+    public function tearDown(): void
+    {
+        parent::tearDown();
+
+        unset($this->zendMonitorHandler);
     }
 
     /**
@@ -29,12 +33,12 @@ class ZendMonitorHandlerTest extends TestCase
     public function testWrite()
     {
         $record = $this->getRecord();
-        $formatterResult = array(
-            'message' => $record['message'],
-        );
+        $formatterResult = [
+            'message' => $record->message,
+        ];
 
         $zendMonitor = $this->getMockBuilder('Monolog\Handler\ZendMonitorHandler')
-            ->setMethods(array('writeZendMonitorCustomEvent', 'getDefaultFormatter'))
+            ->onlyMethods(['writeZendMonitorCustomEvent', 'getDefaultFormatter'])
             ->getMock();
 
         $formatterMock = $this->getMockBuilder('Monolog\Formatter\NormalizerFormatter')
@@ -43,17 +47,20 @@ class ZendMonitorHandlerTest extends TestCase
 
         $formatterMock->expects($this->once())
             ->method('format')
-            ->will($this->returnValue($formatterResult));
+            ->willReturn($formatterResult);
 
         $zendMonitor->expects($this->once())
             ->method('getDefaultFormatter')
-            ->will($this->returnValue($formatterMock));
-
-        $levelMap = $zendMonitor->getLevelMap();
+            ->willReturn($formatterMock);
 
         $zendMonitor->expects($this->once())
             ->method('writeZendMonitorCustomEvent')
-            ->with($levelMap[$record['level']], $record['message'], $formatterResult);
+            ->with(
+                $record->level->getName(),
+                $record->message,
+                $formatterResult,
+                \ZEND_MONITOR_EVENT_SEVERITY_WARNING
+            );
 
         $zendMonitor->handle($record);
     }

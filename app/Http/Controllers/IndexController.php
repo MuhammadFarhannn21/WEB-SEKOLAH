@@ -74,11 +74,7 @@ class IndexController extends Controller
         $judul = $request->q;
         $post = Post::where('status',1)->where('title', 'LIKE', "%{$judul}%")->orderBy('id','DESC')->get();
 
-        if (count($post) > 0) {
-            return view('frontend.search',compact('post','judul'));
-        }else{
-            abort(404);
-        }
+        return view('frontend.search',compact('post','judul'));
     }
 
     public function forum(){
@@ -161,5 +157,40 @@ class IndexController extends Controller
             toast('Gagal Mengisi  Buku Tamu','success','top-right');
             return redirect()->back();
         }
+    }
+    public function fasilitas()
+    {
+        $fasilitas = \App\Fasilitas::where('status','aktif')->orderBy('id','DESC')->get();
+        return view('frontend.fasilitas', compact('fasilitas'));
+    }
+
+    public function showFasilitas($id)
+    {
+        $fasilitas = \App\Fasilitas::findOrFail($id);
+        return view('frontend.showFasilitas', compact('fasilitas'));
+    }
+
+    public function ekstrakurikuler()
+    {
+        $ekskul = \App\Ekstrakurikuler::where('status','aktif')->orderBy('id','DESC')->get();
+        return view('frontend.ekstrakurikuler', compact('ekskul'));
+    }
+
+    public function showEkstrakurikuler($id)
+    {
+        $ekskul = \App\Ekstrakurikuler::findOrFail($id);
+        return view('frontend.showEkstrakurikuler', compact('ekskul'));
+    }
+
+    public function jurusanList()
+    {
+        $jurusan = \App\Jurusan::where('status','aktif')->orderBy('id','DESC')->get();
+        return view('frontend.jurusanList', compact('jurusan'));
+    }
+
+    public function showJurusan($id)
+    {
+        $jurusan = \App\Jurusan::findOrFail($id);
+        return view('frontend.showJurusan', compact('jurusan'));
     }
 }

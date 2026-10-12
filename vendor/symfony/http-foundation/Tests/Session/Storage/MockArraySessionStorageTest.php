@@ -23,24 +23,12 @@ use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
  */
 class MockArraySessionStorageTest extends TestCase
 {
-    /**
-     * @var MockArraySessionStorage
-     */
-    private $storage;
+    private MockArraySessionStorage $storage;
+    private AttributeBag $attributes;
+    private FlashBag $flashes;
+    private array $data;
 
-    /**
-     * @var AttributeBag
-     */
-    private $attributes;
-
-    /**
-     * @var FlashBag
-     */
-    private $flashes;
-
-    private $data;
-
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->attributes = new AttributeBag();
         $this->flashes = new FlashBag();
@@ -54,14 +42,6 @@ class MockArraySessionStorageTest extends TestCase
         $this->storage->registerBag($this->flashes);
         $this->storage->registerBag($this->attributes);
         $this->storage->setSessionData($this->data);
-    }
-
-    protected function tearDown()
-    {
-        $this->data = null;
-        $this->flashes = null;
-        $this->attributes = null;
-        $this->storage = null;
     }
 
     public function testStart()
@@ -121,11 +101,9 @@ class MockArraySessionStorageTest extends TestCase
         $this->assertTrue($storage->isStarted());
     }
 
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testUnstartedSave()
     {
+        $this->expectException(\RuntimeException::class);
         $this->storage->save();
     }
 }

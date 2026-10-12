@@ -11,19 +11,20 @@
 
 namespace Symfony\Component\Translation\Tests\Loader;
 
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use Symfony\Component\Config\Resource\DirectoryResource;
+use Symfony\Component\Translation\Exception\InvalidResourceException;
+use Symfony\Component\Translation\Exception\NotFoundResourceException;
 use Symfony\Component\Translation\Loader\IcuResFileLoader;
 
-/**
- * @requires extension intl
- */
+#[RequiresPhpExtension('intl')]
 class IcuResFileLoaderTest extends LocalizedTestCase
 {
     public function testLoad()
     {
         // resource is build using genrb command
         $loader = new IcuResFileLoader();
-        $resource = __DIR__.'/../fixtures/resourcebundle/res';
+        $resource = __DIR__.'/../Fixtures/resourcebundle/res';
         $catalogue = $loader->load($resource, 'en', 'domain1');
 
         $this->assertEquals(['foo' => 'bar'], $catalogue->all('domain1'));
@@ -31,21 +32,17 @@ class IcuResFileLoaderTest extends LocalizedTestCase
         $this->assertEquals([new DirectoryResource($resource)], $catalogue->getResources());
     }
 
-    /**
-     * @expectedException \Symfony\Component\Translation\Exception\NotFoundResourceException
-     */
     public function testLoadNonExistingResource()
     {
-        $loader = new IcuResFileLoader();
-        $loader->load(__DIR__.'/../fixtures/non-existing.txt', 'en', 'domain1');
+        $this->expectException(NotFoundResourceException::class);
+
+        (new IcuResFileLoader())->load(__DIR__.'/../Fixtures/non-existing.txt', 'en', 'domain1');
     }
 
-    /**
-     * @expectedException \Symfony\Component\Translation\Exception\InvalidResourceException
-     */
     public function testLoadInvalidResource()
     {
-        $loader = new IcuResFileLoader();
-        $loader->load(__DIR__.'/../fixtures/resourcebundle/corrupted', 'en', 'domain1');
+        $this->expectException(InvalidResourceException::class);
+
+        (new IcuResFileLoader())->load(__DIR__.'/../Fixtures/resourcebundle/corrupted', 'en', 'domain1');
     }
 }

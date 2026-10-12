@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,24 +11,22 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * @covers Monolog\Handler\TestHandler
  */
-class TestHandlerTest extends TestCase
+class TestHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    /**
-     * @dataProvider methodProvider
-     */
-    public function testHandler($method, $level)
+    #[DataProvider('methodProvider')]
+    public function testHandler($method, Level $level)
     {
         $handler = new TestHandler;
         $record = $this->getRecord($level, 'test'.$method);
         $this->assertFalse($handler->hasRecords($level));
-        $this->assertFalse($handler->hasRecord($record, $level));
-        $this->assertFalse($handler->{'has'.$method}($record), 'has'.$method);
+        $this->assertFalse($handler->hasRecord($record->message, $level));
+        $this->assertFalse($handler->{'has'.$method}($record->message), 'has'.$method);
         $this->assertFalse($handler->{'has'.$method.'ThatContains'}('test'), 'has'.$method.'ThatContains');
         $this->assertFalse($handler->{'has'.$method.'ThatPasses'}(function ($rec) {
             return true;
@@ -39,8 +37,8 @@ class TestHandlerTest extends TestCase
 
         $this->assertFalse($handler->{'has'.$method}('bar'), 'has'.$method);
         $this->assertTrue($handler->hasRecords($level));
-        $this->assertTrue($handler->hasRecord($record, $level));
-        $this->assertTrue($handler->{'has'.$method}($record), 'has'.$method);
+        $this->assertTrue($handler->hasRecord($record->message, $level));
+        $this->assertTrue($handler->{'has'.$method}($record->message), 'has'.$method);
         $this->assertTrue($handler->{'has'.$method}('test'.$method), 'has'.$method);
         $this->assertTrue($handler->{'has'.$method.'ThatContains'}('test'), 'has'.$method.'ThatContains');
         $this->assertTrue($handler->{'has'.$method.'ThatPasses'}(function ($rec) {
@@ -50,67 +48,69 @@ class TestHandlerTest extends TestCase
         $this->assertTrue($handler->{'has'.$method.'Records'}(), 'has'.$method.'Records');
 
         $records = $handler->getRecords();
-        unset($records[0]['formatted']);
-        $this->assertEquals(array($record), $records);
+        $records[0]->formatted = null;
+        $this->assertEquals([$record], $records);
     }
 
-    public function testHandlerAssertEmptyContext() {
-        $handler = new TestHandler;
-        $record  = $this->getRecord(Logger::WARNING, 'test', array());
-        $this->assertFalse($handler->hasWarning(array(
-            'message' => 'test',
-            'context' => array(),
-        )));
-
-        $handler->handle($record);
-
-        $this->assertTrue($handler->hasWarning(array(
-            'message' => 'test',
-            'context' => array(),
-        )));
-        $this->assertFalse($handler->hasWarning(array(
-            'message' => 'test',
-            'context' => array(
-                'foo' => 'bar'
-            ),
-        )));
-    }
-
-    public function testHandlerAssertNonEmptyContext() {
-        $handler = new TestHandler;
-        $record  = $this->getRecord(Logger::WARNING, 'test', array('foo' => 'bar'));
-        $this->assertFalse($handler->hasWarning(array(
-            'message' => 'test',
-            'context' => array(
-                'foo' => 'bar'
-            ),
-        )));
-
-        $handler->handle($record);
-
-        $this->assertTrue($handler->hasWarning(array(
-            'message' => 'test',
-            'context' => array(
-                'foo' => 'bar'
-            ),
-        )));
-        $this->assertFalse($handler->hasWarning(array(
-            'message' => 'test',
-            'context' => array(),
-        )));
-    }
-
-    public function methodProvider()
+    public function testHandlerAssertEmptyContext()
     {
-        return array(
-            array('Emergency', Logger::EMERGENCY),
-            array('Alert'    , Logger::ALERT),
-            array('Critical' , Logger::CRITICAL),
-            array('Error'    , Logger::ERROR),
-            array('Warning'  , Logger::WARNING),
-            array('Info'     , Logger::INFO),
-            array('Notice'   , Logger::NOTICE),
-            array('Debug'    , Logger::DEBUG),
-        );
+        $handler = new TestHandler;
+        $record  = $this->getRecord(Level::Warning, 'test', []);
+        $this->assertFalse($handler->hasWarning([
+            'message' => 'test',
+            'context' => [],
+        ]));
+
+        $handler->handle($record);
+
+        $this->assertTrue($handler->hasWarning([
+            'message' => 'test',
+            'context' => [],
+        ]));
+        $this->assertFalse($handler->hasWarning([
+            'message' => 'test',
+            'context' => [
+                'foo' => 'bar',
+            ],
+        ]));
+    }
+
+    public function testHandlerAssertNonEmptyContext()
+    {
+        $handler = new TestHandler;
+        $record  = $this->getRecord(Level::Warning, 'test', ['foo' => 'bar']);
+        $this->assertFalse($handler->hasWarning([
+            'message' => 'test',
+            'context' => [
+                'foo' => 'bar',
+            ],
+        ]));
+
+        $handler->handle($record);
+
+        $this->assertTrue($handler->hasWarning([
+            'message' => 'test',
+            'context' => [
+                'foo' => 'bar',
+            ],
+        ]));
+        $this->assertFalse($handler->hasWarning([
+            'message' => 'test',
+            'context' => [],
+        ]));
+    }
+
+    public static function methodProvider()
+    {
+        return [
+            ['Emergency', Level::Emergency],
+            ['Alert'    , Level::Alert],
+            ['Critical' , Level::Critical],
+            ['Error'    , Level::Error],
+            ['Warning'  , Level::Warning],
+            ['Info'     , Level::Info],
+            ['Notice'   , Level::Notice],
+            ['Debug'    , Level::Debug],
+        ];
     }
 }

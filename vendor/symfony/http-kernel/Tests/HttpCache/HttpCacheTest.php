@@ -11,23 +11,25 @@
 
 namespace Symfony\Component\HttpKernel\Tests\HttpCache;
 
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\TerminateEvent;
 use Symfony\Component\HttpKernel\HttpCache\Esi;
 use Symfony\Component\HttpKernel\HttpCache\HttpCache;
 use Symfony\Component\HttpKernel\HttpCache\Store;
+use Symfony\Component\HttpKernel\HttpCache\StoreInterface;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\Kernel;
 
-/**
- * @group time-sensitive
- */
+#[Group('time-sensitive')]
 class HttpCacheTest extends HttpCacheTestCase
 {
     public function testTerminateDelegatesTerminationOnlyForTerminableInterface()
     {
-        $storeMock = $this->getMockBuilder('Symfony\\Component\\HttpKernel\\HttpCache\\StoreInterface')
-            ->disableOriginalConstructor()
-            ->getMock();
+        $storeMock = $this->createStub(StoreInterface::class);
 
         // does not implement TerminableInterface
         $kernel = new TestKernel();
@@ -37,9 +39,9 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertFalse($kernel->terminateCalled, 'terminate() is never called if the kernel class does not implement TerminableInterface');
 
         // implements TerminableInterface
-        $kernelMock = $this->getMockBuilder('Symfony\\Component\\HttpKernel\\Kernel')
+        $kernelMock = $this->getMockBuilder(Kernel::class)
             ->disableOriginalConstructor()
-            ->setMethods(['terminate', 'registerBundles', 'registerContainerConfiguration'])
+            ->onlyMethods(['terminate', 'registerBundles', 'registerContainerConfiguration'])
             ->getMock();
 
         $kernelMock->expects($this->once())
@@ -49,6 +51,52 @@ class HttpCacheTest extends HttpCacheTestCase
         $kernel->terminate(Request::create('/'), new Response());
     }
 
+    public function testDoesNotCallTerminateOnFreshResponse()
+    {
+        $terminateEvents = [];
+
+        $eventDispatcher = $this->createMock(EventDispatcher::class);
+        $eventDispatcher
+            ->expects($this->atLeastOnce())
+            ->method('dispatch')
+            ->with($this->callback(function ($event) use (&$terminateEvents) {
+                if ($event instanceof TerminateEvent) {
+                    $terminateEvents[] = $event;
+                }
+
+                return true;
+            }));
+
+        $this->setNextResponse(
+            200,
+            [
+                'ETag' => '1234',
+                'Cache-Control' => 'public, s-maxage=60',
+            ],
+            'Hello World',
+            null,
+            $eventDispatcher
+        );
+
+        $this->request('GET', '/');
+        $this->assertHttpKernelIsCalled();
+        $this->assertEquals(200, $this->response->getStatusCode());
+        $this->assertTraceContains('miss');
+        $this->assertTraceContains('store');
+        $this->cache->terminate($this->request, $this->response);
+
+        sleep(2);
+
+        $this->request('GET', '/');
+        $this->assertHttpKernelIsNotCalled();
+        $this->assertEquals(200, $this->response->getStatusCode());
+        $this->assertTraceContains('fresh');
+        $this->assertEquals(2, $this->response->headers->get('Age'));
+        $this->cache->terminate($this->request, $this->response);
+
+        $this->assertCount(1, $terminateEvents);
+    }
+
     public function testPassesOnNonGetHeadRequests()
     {
         $this->setNextResponse(200);
@@ -56,6 +104,17 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertHttpKernelIsCalled();
         $this->assertResponseOk();
         $this->assertTraceContains('pass');
+        $this->assertFalse($this->response->headers->has('Age'));
+    }
+
+    public function testPassesSuspiciousMethodRequests()
+    {
+        $this->setNextResponse(200);
+        $this->request('POST', '/', ['HTTP_X-HTTP-Method-Override' => '__CONSTRUCT']);
+        $this->assertHttpKernelIsCalled();
+        $this->assertResponseOk();
+        $this->assertTraceNotContains('stale');
+        $this->assertTraceNotContains('invalid');
         $this->assertFalse($this->response->headers->has('Age'));
     }
 
@@ -127,15 +186,15 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testRespondsWith304WhenIfModifiedSinceMatchesLastModified()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
 
-        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Last-Modified' => $time->format(DATE_RFC2822), 'Content-Type' => 'text/plain'], 'Hello World');
-        $this->request('GET', '/', ['HTTP_IF_MODIFIED_SINCE' => $time->format(DATE_RFC2822)]);
+        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Last-Modified' => $time->format(\DATE_RFC2822), 'Content-Type' => 'text/plain'], 'Hello World');
+        $this->request('GET', '/', ['HTTP_IF_MODIFIED_SINCE' => $time->format(\DATE_RFC2822)]);
 
         $this->assertHttpKernelIsCalled();
         $this->assertEquals(304, $this->response->getStatusCode());
         $this->assertEquals('', $this->response->headers->get('Content-Type'));
-        $this->assertEmpty($this->response->getContent());
+        $this->assertSame('', $this->response->getContent());
         $this->assertTraceContains('miss');
         $this->assertTraceContains('store');
     }
@@ -149,36 +208,36 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertEquals(304, $this->response->getStatusCode());
         $this->assertEquals('', $this->response->headers->get('Content-Type'));
         $this->assertTrue($this->response->headers->has('ETag'));
-        $this->assertEmpty($this->response->getContent());
+        $this->assertSame('', $this->response->getContent());
         $this->assertTraceContains('miss');
         $this->assertTraceContains('store');
     }
 
-    public function testRespondsWith304OnlyIfIfNoneMatchAndIfModifiedSinceBothMatch()
+    public function testRespondsWith304WhenIfNoneMatchAndIfModifiedSinceBothMatch()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
 
         $this->setNextResponse(200, [], '', function ($request, $response) use ($time) {
             $response->setStatusCode(200);
             $response->headers->set('ETag', '12345');
-            $response->headers->set('Last-Modified', $time->format(DATE_RFC2822));
+            $response->headers->set('Last-Modified', $time->format(\DATE_RFC2822));
             $response->headers->set('Content-Type', 'text/plain');
             $response->setContent('Hello World');
         });
 
         // only ETag matches
-        $t = \DateTime::createFromFormat('U', time() - 3600);
-        $this->request('GET', '/', ['HTTP_IF_NONE_MATCH' => '12345', 'HTTP_IF_MODIFIED_SINCE' => $t->format(DATE_RFC2822)]);
+        $t = \DateTimeImmutable::createFromFormat('U', time() - 3600);
+        $this->request('GET', '/', ['HTTP_IF_NONE_MATCH' => '12345', 'HTTP_IF_MODIFIED_SINCE' => $t->format(\DATE_RFC2822)]);
         $this->assertHttpKernelIsCalled();
-        $this->assertEquals(200, $this->response->getStatusCode());
+        $this->assertEquals(304, $this->response->getStatusCode());
 
         // only Last-Modified matches
-        $this->request('GET', '/', ['HTTP_IF_NONE_MATCH' => '1234', 'HTTP_IF_MODIFIED_SINCE' => $time->format(DATE_RFC2822)]);
+        $this->request('GET', '/', ['HTTP_IF_NONE_MATCH' => '1234', 'HTTP_IF_MODIFIED_SINCE' => $time->format(\DATE_RFC2822)]);
         $this->assertHttpKernelIsCalled();
         $this->assertEquals(200, $this->response->getStatusCode());
 
         // Both matches
-        $this->request('GET', '/', ['HTTP_IF_NONE_MATCH' => '12345', 'HTTP_IF_MODIFIED_SINCE' => $time->format(DATE_RFC2822)]);
+        $this->request('GET', '/', ['HTTP_IF_NONE_MATCH' => '12345', 'HTTP_IF_MODIFIED_SINCE' => $time->format(\DATE_RFC2822)]);
         $this->assertHttpKernelIsCalled();
         $this->assertEquals(304, $this->response->getStatusCode());
     }
@@ -210,12 +269,12 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testValidatesPrivateResponsesCachedOnTheClient()
     {
-        $this->setNextResponse(200, [], '', function ($request, $response) {
-            $etags = preg_split('/\s*,\s*/', $request->headers->get('IF_NONE_MATCH'));
+        $this->setNextResponse(200, [], '', function (Request $request, $response) {
+            $etags = preg_split('/\s*,\s*/', $request->headers->get('IF_NONE_MATCH', ''));
             if ($request->cookies->has('authenticated')) {
                 $response->headers->set('Cache-Control', 'private, no-store');
                 $response->setETag('"private tag"');
-                if (\in_array('"private tag"', $etags)) {
+                if (\in_array('"private tag"', $etags, true)) {
                     $response->setStatusCode(304);
                 } else {
                     $response->setStatusCode(200);
@@ -225,7 +284,7 @@ class HttpCacheTest extends HttpCacheTestCase
             } else {
                 $response->headers->set('Cache-Control', 'public');
                 $response->setETag('"public tag"');
-                if (\in_array('"public tag"', $etags)) {
+                if (\in_array('"public tag"', $etags, true)) {
                     $response->setStatusCode(304);
                 } else {
                     $response->setStatusCode(200);
@@ -255,9 +314,9 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testStoresResponsesWhenNoCacheRequestDirectivePresent()
     {
-        $time = \DateTime::createFromFormat('U', time() + 5);
+        $time = \DateTimeImmutable::createFromFormat('U', time() + 5);
 
-        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(DATE_RFC2822)]);
+        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(\DATE_RFC2822)]);
         $this->request('GET', '/', ['HTTP_CACHE_CONTROL' => 'no-cache']);
 
         $this->assertHttpKernelIsCalled();
@@ -392,8 +451,8 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testFetchesResponseFromBackendWhenCacheMisses()
     {
-        $time = \DateTime::createFromFormat('U', time() + 5);
-        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(DATE_RFC2822)]);
+        $time = \DateTimeImmutable::createFromFormat('U', time() + 5);
+        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(\DATE_RFC2822)]);
 
         $this->request('GET', '/');
         $this->assertEquals(200, $this->response->getStatusCode());
@@ -404,8 +463,8 @@ class HttpCacheTest extends HttpCacheTestCase
     public function testDoesNotCacheSomeStatusCodeResponses()
     {
         foreach (array_merge(range(201, 202), range(204, 206), range(303, 305), range(400, 403), range(405, 409), range(411, 417), range(500, 505)) as $code) {
-            $time = \DateTime::createFromFormat('U', time() + 5);
-            $this->setNextResponse($code, ['Expires' => $time->format(DATE_RFC2822)]);
+            $time = \DateTimeImmutable::createFromFormat('U', time() + 5);
+            $this->setNextResponse($code, ['Expires' => $time->format(\DATE_RFC2822)]);
 
             $this->request('GET', '/');
             $this->assertEquals($code, $this->response->getStatusCode());
@@ -416,8 +475,8 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testDoesNotCacheResponsesWithExplicitNoStoreDirective()
     {
-        $time = \DateTime::createFromFormat('U', time() + 5);
-        $this->setNextResponse(200, ['Expires' => $time->format(DATE_RFC2822), 'Cache-Control' => 'no-store']);
+        $time = \DateTimeImmutable::createFromFormat('U', time() + 5);
+        $this->setNextResponse(200, ['Expires' => $time->format(\DATE_RFC2822), 'Cache-Control' => 'no-store']);
 
         $this->request('GET', '/');
         $this->assertTraceNotContains('store');
@@ -435,18 +494,34 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testCachesResponsesWithExplicitNoCacheDirective()
     {
-        $time = \DateTime::createFromFormat('U', time() + 5);
-        $this->setNextResponse(200, ['Expires' => $time->format(DATE_RFC2822), 'Cache-Control' => 'public, no-cache']);
+        $time = \DateTimeImmutable::createFromFormat('U', time() + 5);
+        $this->setNextResponse(200, ['Expires' => $time->format(\DATE_RFC2822), 'Cache-Control' => 'public, no-cache']);
 
         $this->request('GET', '/');
         $this->assertTraceContains('store');
         $this->assertTrue($this->response->headers->has('Age'));
     }
 
+    public function testRevalidatesResponsesWithNoCacheDirectiveEvenIfFresh()
+    {
+        $this->setNextResponse(200, ['Cache-Control' => 'public, no-cache, max-age=10', 'ETag' => 'some-etag'], 'OK');
+        $this->request('GET', '/'); // warm the cache
+
+        sleep(5);
+
+        $this->setNextResponse(304, ['Cache-Control' => 'public, no-cache, max-age=10', 'ETag' => 'some-etag']);
+        $this->request('GET', '/');
+
+        $this->assertHttpKernelIsCalled(); // no-cache -> MUST have revalidated at origin
+        $this->assertTraceContains('valid');
+        $this->assertEquals('OK', $this->response->getContent());
+        $this->assertEquals(0, $this->response->getAge());
+    }
+
     public function testCachesResponsesWithAnExpirationHeader()
     {
-        $time = \DateTime::createFromFormat('U', time() + 5);
-        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(DATE_RFC2822)]);
+        $time = \DateTimeImmutable::createFromFormat('U', time() + 5);
+        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(\DATE_RFC2822)]);
 
         $this->request('GET', '/');
         $this->assertEquals(200, $this->response->getStatusCode());
@@ -494,8 +569,8 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testCachesResponsesWithALastModifiedValidatorButNoFreshnessInformation()
     {
-        $time = \DateTime::createFromFormat('U', time());
-        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Last-Modified' => $time->format(DATE_RFC2822)]);
+        $time = \DateTimeImmutable::createFromFormat('U', time());
+        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Last-Modified' => $time->format(\DATE_RFC2822)]);
 
         $this->request('GET', '/');
         $this->assertEquals(200, $this->response->getStatusCode());
@@ -517,9 +592,9 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testHitsCachedResponsesWithExpiresHeader()
     {
-        $time1 = \DateTime::createFromFormat('U', time() - 5);
-        $time2 = \DateTime::createFromFormat('U', time() + 5);
-        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Date' => $time1->format(DATE_RFC2822), 'Expires' => $time2->format(DATE_RFC2822)]);
+        $time1 = \DateTimeImmutable::createFromFormat('U', time() - 5);
+        $time2 = \DateTimeImmutable::createFromFormat('U', time() + 5);
+        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Date' => $time1->format(\DATE_RFC2822), 'Expires' => $time2->format(\DATE_RFC2822)]);
 
         $this->request('GET', '/');
         $this->assertHttpKernelIsCalled();
@@ -542,8 +617,8 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testHitsCachedResponseWithMaxAgeDirective()
     {
-        $time = \DateTime::createFromFormat('U', time() - 5);
-        $this->setNextResponse(200, ['Date' => $time->format(DATE_RFC2822), 'Cache-Control' => 'public, max-age=10']);
+        $time = \DateTimeImmutable::createFromFormat('U', time() - 5);
+        $this->setNextResponse(200, ['Date' => $time->format(\DATE_RFC2822), 'Cache-Control' => 'public, max-age=10']);
 
         $this->request('GET', '/');
         $this->assertHttpKernelIsCalled();
@@ -572,7 +647,7 @@ class HttpCacheTest extends HttpCacheTestCase
 
         $this->cacheConfig['stale_while_revalidate'] = 10;
 
-        // The prescence of Last-Modified makes this cacheable (because Response::isValidateable() then).
+        // The presence of Last-Modified makes this cacheable (because Response::isValidateable() then).
         $this->setNextResponse(200, ['Cache-Control' => 'public, s-maxage=5', 'Last-Modified' => 'some while ago'], 'Old response');
         $this->request('GET', '/'); // warm the cache
 
@@ -586,6 +661,7 @@ class HttpCacheTest extends HttpCacheTestCase
          */
         sleep(10);
 
+        $this->store = $this->createStore(); // create another store instance that does not hold the current lock
         $this->request('GET', '/');
         $this->assertHttpKernelIsNotCalled();
         $this->assertEquals(200, $this->response->getStatusCode());
@@ -604,10 +680,94 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertEquals('Old response', $this->response->getContent());
     }
 
+    public function testHitBackendOnlyOnceWhenCacheWasLocked()
+    {
+        // Disable stale-while-revalidate, it circumvents waiting for the lock
+        $this->cacheConfig['stale_while_revalidate'] = 0;
+
+        $this->setNextResponses([
+            [
+                'status' => 200,
+                'body' => 'initial response',
+                'headers' => [
+                    'Cache-Control' => 'public, no-cache',
+                    'Last-Modified' => 'some while ago',
+                ],
+            ],
+            [
+                'status' => 304,
+                'body' => '',
+                'headers' => [
+                    'Cache-Control' => 'public, no-cache',
+                    'Last-Modified' => 'some while ago',
+                ],
+            ],
+            [
+                'status' => 500,
+                'body' => 'The backend should not be called twice during revalidation',
+                'headers' => [],
+            ],
+        ]);
+
+        $this->request('GET', '/'); // warm the cache
+
+        // Use a store that simulates a cache entry being locked upon first attempt
+        $this->store = new class(sys_get_temp_dir().'/http_cache') extends Store {
+            private bool $hasLock = false;
+
+            public function lock(Request $request): bool
+            {
+                $hasLock = $this->hasLock;
+                $this->hasLock = true;
+
+                return $hasLock;
+            }
+
+            public function isLocked(Request $request): bool
+            {
+                return false;
+            }
+        };
+
+        $this->request('GET', '/'); // hit the cache with simulated lock/concurrency block
+
+        $this->assertEquals(200, $this->response->getStatusCode());
+        $this->assertEquals('initial response', $this->response->getContent());
+
+        $traces = $this->cache->getTraces();
+        $this->assertSame(['waiting', 'stale', 'valid', 'store'], current($traces));
+    }
+
+    public function testTraceAddedWhenCacheLocked()
+    {
+        if ('\\' === \DIRECTORY_SEPARATOR) {
+            $this->markTestSkipped('Skips on windows to avoid permissions issues.');
+        }
+
+        // Disable stale-while-revalidate, which circumvents blocking access
+        $this->cacheConfig['stale_while_revalidate'] = 0;
+
+        // The presence of Last-Modified makes this cacheable
+        $this->setNextResponse(200, ['Cache-Control' => 'public, no-cache', 'Last-Modified' => 'some while ago'], 'Old response');
+        $this->request('GET', '/'); // warm the cache
+
+        $primedStore = $this->store;
+
+        $this->store = $this->createStub(Store::class);
+        $this->store->method('lookup')->willReturnCallback(fn (Request $request) => $primedStore->lookup($request));
+        // Assume the cache is locked at the first attempt, but immediately treat the lock as released afterwards
+        $this->store->method('lock')->willReturnOnConsecutiveCalls(false, true);
+        $this->store->method('isLocked')->willReturn(false);
+
+        $this->request('GET', '/');
+
+        $this->assertTraceContains('waiting');
+    }
+
     public function testHitsCachedResponseWithSMaxAgeDirective()
     {
-        $time = \DateTime::createFromFormat('U', time() - 5);
-        $this->setNextResponse(200, ['Date' => $time->format(DATE_RFC2822), 'Cache-Control' => 's-maxage=10, max-age=0']);
+        $time = \DateTimeImmutable::createFromFormat('U', time() - 5);
+        $this->setNextResponse(200, ['Date' => $time->format(\DATE_RFC2822), 'Cache-Control' => 's-maxage=10, max-age=0']);
 
         $this->request('GET', '/');
         $this->assertHttpKernelIsCalled();
@@ -638,7 +798,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('miss');
         $this->assertTraceContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=10/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=10/', $this->response->headers->get('Cache-Control'));
 
         $this->cacheConfig['default_ttl'] = 10;
         $this->request('GET', '/');
@@ -647,7 +807,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('fresh');
         $this->assertTraceNotContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=10/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=10/', $this->response->headers->get('Cache-Control'));
     }
 
     public function testAssignsDefaultTtlWhenResponseHasNoFreshnessInformationAndAfterTtlWasExpired()
@@ -660,7 +820,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('miss');
         $this->assertTraceContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=2/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=(2|3)/', $this->response->headers->get('Cache-Control'));
 
         $this->request('GET', '/');
         $this->assertHttpKernelIsNotCalled();
@@ -668,17 +828,16 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('fresh');
         $this->assertTraceNotContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=2/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=(2|3)/', $this->response->headers->get('Cache-Control'));
 
         // expires the cache
         $values = $this->getMetaStorageValues();
         $this->assertCount(1, $values);
         $tmp = unserialize($values[0]);
-        $time = \DateTime::createFromFormat('U', time() - 5);
-        $tmp[0][1]['date'] = $time->format(DATE_RFC2822);
+        $time = \DateTimeImmutable::createFromFormat('U', time() - 5);
+        $tmp[0][1]['date'] = $time->format(\DATE_RFC2822);
         $r = new \ReflectionObject($this->store);
         $m = $r->getMethod('save');
-        $m->setAccessible(true);
         $m->invoke($this->store, 'md'.hash('sha256', 'http://localhost/'), serialize($tmp));
 
         $this->request('GET', '/');
@@ -688,7 +847,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('invalid');
         $this->assertTraceContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=2/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=(2|3)/', $this->response->headers->get('Cache-Control'));
 
         $this->setNextResponse();
 
@@ -698,7 +857,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('fresh');
         $this->assertTraceNotContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=2/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=(2|3)/', $this->response->headers->get('Cache-Control'));
     }
 
     public function testAssignsDefaultTtlWhenResponseHasNoFreshnessInformationAndAfterTtlWasExpiredWithStatus304()
@@ -711,7 +870,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('miss');
         $this->assertTraceContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=2/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=(2|3)/', $this->response->headers->get('Cache-Control'));
 
         $this->request('GET', '/');
         $this->assertHttpKernelIsNotCalled();
@@ -724,11 +883,10 @@ class HttpCacheTest extends HttpCacheTestCase
         $values = $this->getMetaStorageValues();
         $this->assertCount(1, $values);
         $tmp = unserialize($values[0]);
-        $time = \DateTime::createFromFormat('U', time() - 5);
-        $tmp[0][1]['date'] = $time->format(DATE_RFC2822);
+        $time = \DateTimeImmutable::createFromFormat('U', time() - 5);
+        $tmp[0][1]['date'] = $time->format(\DATE_RFC2822);
         $r = new \ReflectionObject($this->store);
         $m = $r->getMethod('save');
-        $m->setAccessible(true);
         $m->invoke($this->store, 'md'.hash('sha256', 'http://localhost/'), serialize($tmp));
 
         $this->request('GET', '/');
@@ -739,7 +897,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('store');
         $this->assertTraceNotContains('miss');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=2/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=(2|3)/', $this->response->headers->get('Cache-Control'));
 
         $this->request('GET', '/');
         $this->assertHttpKernelIsNotCalled();
@@ -747,7 +905,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertTraceContains('fresh');
         $this->assertTraceNotContains('store');
         $this->assertEquals('Hello World', $this->response->getContent());
-        $this->assertRegExp('/s-maxage=2/', $this->response->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('/s-maxage=(2|3)/', $this->response->headers->get('Cache-Control'));
     }
 
     public function testDoesNotAssignDefaultTtlWhenResponseHasMustRevalidateDirective()
@@ -760,14 +918,14 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->assertEquals(200, $this->response->getStatusCode());
         $this->assertTraceContains('miss');
         $this->assertTraceNotContains('store');
-        $this->assertNotRegExp('/s-maxage/', $this->response->headers->get('Cache-Control'));
+        $this->assertDoesNotMatchRegularExpression('/s-maxage/', $this->response->headers->get('Cache-Control'));
         $this->assertEquals('Hello World', $this->response->getContent());
     }
 
     public function testFetchesFullResponseWhenCacheStaleAndNoValidatorsPresent()
     {
-        $time = \DateTime::createFromFormat('U', time() + 5);
-        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(DATE_RFC2822)]);
+        $time = \DateTimeImmutable::createFromFormat('U', time() + 5);
+        $this->setNextResponse(200, ['Cache-Control' => 'public', 'Expires' => $time->format(\DATE_RFC2822)]);
 
         // build initial request
         $this->request('GET', '/');
@@ -784,11 +942,10 @@ class HttpCacheTest extends HttpCacheTestCase
         $values = $this->getMetaStorageValues();
         $this->assertCount(1, $values);
         $tmp = unserialize($values[0]);
-        $time = \DateTime::createFromFormat('U', time());
-        $tmp[0][1]['expires'] = $time->format(DATE_RFC2822);
+        $time = \DateTimeImmutable::createFromFormat('U', time());
+        $tmp[0][1]['expires'] = $time->format(\DATE_RFC2822);
         $r = new \ReflectionObject($this->store);
         $m = $r->getMethod('save');
-        $m->setAccessible(true);
         $m->invoke($this->store, 'md'.hash('sha256', 'http://localhost/'), serialize($tmp));
 
         // build subsequent request; should be found but miss due to freshness
@@ -806,11 +963,11 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testValidatesCachedResponsesWithLastModifiedAndNoFreshnessInformation()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
         $this->setNextResponse(200, [], 'Hello World', function ($request, $response) use ($time) {
             $response->headers->set('Cache-Control', 'public');
-            $response->headers->set('Last-Modified', $time->format(DATE_RFC2822));
-            if ($time->format(DATE_RFC2822) == $request->headers->get('IF_MODIFIED_SINCE')) {
+            $response->headers->set('Last-Modified', $time->format(\DATE_RFC2822));
+            if ($time->format(\DATE_RFC2822) == $request->headers->get('IF_MODIFIED_SINCE')) {
                 $response->setStatusCode(304);
                 $response->setContent('');
             }
@@ -843,10 +1000,8 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testValidatesCachedResponsesUseSameHttpMethod()
     {
-        $test = $this;
-
-        $this->setNextResponse(200, [], 'Hello World', function ($request, $response) use ($test) {
-            $test->assertSame('OPTIONS', $request->getMethod());
+        $this->setNextResponse(200, [], 'Hello World', function ($request, $response) {
+            $this->assertSame('OPTIONS', $request->getMethod());
         });
 
         // build initial request
@@ -859,6 +1014,7 @@ class HttpCacheTest extends HttpCacheTestCase
     public function testValidatesCachedResponsesWithETagAndNoFreshnessInformation()
     {
         $this->setNextResponse(200, [], 'Hello World', function ($request, $response) {
+            $this->assertFalse($request->headers->has('If-Modified-Since'));
             $response->headers->set('Cache-Control', 'public');
             $response->headers->set('ETag', '"12345"');
             if ($response->getETag() == $request->headers->get('IF_NONE_MATCH')) {
@@ -893,11 +1049,11 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testServesResponseWhileFreshAndRevalidatesWithLastModifiedInformation()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
 
         $this->setNextResponse(200, [], 'Hello World', function (Request $request, Response $response) use ($time) {
             $response->setSharedMaxAge(10);
-            $response->headers->set('Last-Modified', $time->format(DATE_RFC2822));
+            $response->headers->set('Last-Modified', $time->format(\DATE_RFC2822));
         });
 
         // prime the cache
@@ -914,7 +1070,7 @@ class HttpCacheTest extends HttpCacheTestCase
         sleep(15); // expire the cache
 
         $this->setNextResponse(304, [], '', function (Request $request, Response $response) use ($time) {
-            $this->assertEquals($time->format(DATE_RFC2822), $request->headers->get('IF_MODIFIED_SINCE'));
+            $this->assertEquals($time->format(\DATE_RFC2822), $request->headers->get('IF_MODIFIED_SINCE'));
         });
 
         $this->request('GET', '/');
@@ -927,10 +1083,10 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testReplacesCachedResponsesWhenValidationResultsInNon304Response()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
         $count = 0;
         $this->setNextResponse(200, [], 'Hello World', function ($request, $response) use ($time, &$count) {
-            $response->headers->set('Last-Modified', $time->format(DATE_RFC2822));
+            $response->headers->set('Last-Modified', $time->format(\DATE_RFC2822));
             $response->headers->set('Cache-Control', 'public');
             switch (++$count) {
                 case 1:
@@ -999,17 +1155,17 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testSendsNoContentWhenFresh()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
         $this->setNextResponse(200, [], 'Hello World', function ($request, $response) use ($time) {
             $response->headers->set('Cache-Control', 'public, max-age=10');
-            $response->headers->set('Last-Modified', $time->format(DATE_RFC2822));
+            $response->headers->set('Last-Modified', $time->format(\DATE_RFC2822));
         });
 
         $this->request('GET', '/');
         $this->assertHttpKernelIsCalled();
         $this->assertEquals('Hello World', $this->response->getContent());
 
-        $this->request('GET', '/', ['HTTP_IF_MODIFIED_SINCE' => $time->format(DATE_RFC2822)]);
+        $this->request('GET', '/', ['HTTP_IF_MODIFIED_SINCE' => $time->format(\DATE_RFC2822)]);
         $this->assertHttpKernelIsNotCalled();
         $this->assertEquals(304, $this->response->getStatusCode());
         $this->assertEquals('', $this->response->getContent());
@@ -1192,7 +1348,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $responses = [
             [
                 'status' => 200,
-                'body' => 'I am a long-lived master response, but I embed a short-lived resource: <esi:include src="/foo" />',
+                'body' => 'I am a long-lived main response, but I embed a short-lived resource: <esi:include src="/foo" />',
                 'headers' => [
                     'Cache-Control' => 's-maxage=300',
                     'Surrogate-Control' => 'content="ESI/1.0"',
@@ -1209,8 +1365,177 @@ class HttpCacheTest extends HttpCacheTestCase
 
         $this->request('HEAD', '/', [], [], true);
 
-        $this->assertEmpty($this->response->getContent());
+        $this->assertSame('', $this->response->getContent());
         $this->assertEquals(100, $this->response->getTtl());
+    }
+
+    public function testEsiCacheIncludesEmbeddedResponseContentWhenMainResponseFailsRevalidationAndEmbeddedResponseIsFresh()
+    {
+        $this->setNextResponses([
+            [
+                'status' => 200,
+                'body' => 'main <esi:include src="/foo" />',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=0', // goes stale immediately
+                    'Surrogate-Control' => 'content="ESI/1.0"',
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:00:00 +0000',
+                ],
+            ],
+            [
+                'status' => 200,
+                'body' => 'embedded',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=10', // stays fresh
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:05:00 +0000',
+                ],
+            ],
+        ]);
+
+        // prime the cache
+        $this->request('GET', '/', [], [], true);
+        $this->assertSame(200, $this->response->getStatusCode());
+        $this->assertSame('main embedded', $this->response->getContent());
+        $this->assertSame('Mon, 12 Aug 2024 10:05:00 +0000', $this->response->getLastModified()->format(\DATE_RFC2822)); // max of both values
+
+        $this->setNextResponses([
+            [
+                // On the next request, the main response has an updated Last-Modified (main page was modified)...
+                'status' => 200,
+                'body' => 'main <esi:include src="/foo" />',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=0',
+                    'Surrogate-Control' => 'content="ESI/1.0"',
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:10:00 +0000',
+                ],
+            ],
+            // no revalidation request happens for the embedded response, since it is still fresh
+        ]);
+
+        // Re-request with Last-Modified time that we received when the cache was primed
+        $this->request('GET', '/', ['HTTP_IF_MODIFIED_SINCE' => 'Mon, 12 Aug 2024 10:05:00 +0000'], [], true);
+
+        $this->assertSame(200, $this->response->getStatusCode());
+
+        // The cache should use the content ("embedded") from the cached entry
+        $this->assertSame('main embedded', $this->response->getContent());
+
+        $traces = $this->cache->getTraces();
+        $this->assertSame(['stale', 'invalid', 'store'], $traces['GET /']);
+
+        // The embedded resource was still fresh
+        $this->assertSame(['fresh'], $traces['GET /foo']);
+    }
+
+    public function testEsiCacheIncludesEmbeddedResponseContentWhenMainResponseFailsRevalidationAndEmbeddedResponseIsValid()
+    {
+        $this->setNextResponses([
+            [
+                'status' => 200,
+                'body' => 'main <esi:include src="/foo" />',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=0', // goes stale immediately
+                    'Surrogate-Control' => 'content="ESI/1.0"',
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:00:00 +0000',
+                ],
+            ],
+            [
+                'status' => 200,
+                'body' => 'embedded',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=0', // goes stale immediately
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:05:00 +0000',
+                ],
+            ],
+        ]);
+
+        // prime the cache
+        $this->request('GET', '/', [], [], true);
+        $this->assertSame(200, $this->response->getStatusCode());
+        $this->assertSame('main embedded', $this->response->getContent());
+        $this->assertSame('Mon, 12 Aug 2024 10:05:00 +0000', $this->response->getLastModified()->format(\DATE_RFC2822)); // max of both values
+
+        $this->setNextResponses([
+            [
+                // On the next request, the main response has an updated Last-Modified (main page was modified)...
+                'status' => 200,
+                'body' => 'main <esi:include src="/foo" />',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=0',
+                    'Surrogate-Control' => 'content="ESI/1.0"',
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:10:00 +0000',
+                ],
+            ],
+            [
+                // We have a stale cache entry for the embedded response which will be revalidated.
+                // Let's assume the resource did not change, so the controller sends a 304 without content body.
+                'status' => 304,
+                'body' => '',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=0',
+                ],
+            ],
+        ]);
+
+        // Re-request with Last-Modified time that we received when the cache was primed
+        $this->request('GET', '/', ['HTTP_IF_MODIFIED_SINCE' => 'Mon, 12 Aug 2024 10:05:00 +0000'], [], true);
+
+        $this->assertSame(200, $this->response->getStatusCode());
+
+        // The cache should use the content ("embedded") from the cached entry
+        $this->assertSame('main embedded', $this->response->getContent());
+
+        $traces = $this->cache->getTraces();
+        $this->assertSame(['stale', 'invalid', 'store'], $traces['GET /']);
+
+        // Check that the embedded resource was successfully revalidated
+        $this->assertSame(['stale', 'valid', 'store'], $traces['GET /foo']);
+    }
+
+    public function testEsiCacheIncludesEmbeddedResponseContentWhenMainAndEmbeddedResponseAreFresh()
+    {
+        $this->setNextResponses([
+            [
+                'status' => 200,
+                'body' => 'main <esi:include src="/foo" />',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=10',
+                    'Surrogate-Control' => 'content="ESI/1.0"',
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:05:00 +0000',
+                ],
+            ],
+            [
+                'status' => 200,
+                'body' => 'embedded',
+                'headers' => [
+                    'Cache-Control' => 's-maxage=10',
+                    'Last-Modified' => 'Mon, 12 Aug 2024 10:00:00 +0000',
+                ],
+            ],
+        ]);
+
+        // prime the cache
+        $this->request('GET', '/', [], [], true);
+        $this->assertSame(200, $this->response->getStatusCode());
+        $this->assertSame('main embedded', $this->response->getContent());
+        $this->assertSame('Mon, 12 Aug 2024 10:05:00 +0000', $this->response->getLastModified()->format(\DATE_RFC2822));
+
+        // Assume that a client received 'Mon, 12 Aug 2024 10:00:00 +0000' as last-modified information in the past. This may, for example,
+        // be the case when the "main" response at that point had an older Last-Modified time, so the embedded response's Last-Modified time
+        // governed the result for the combined response. In other words, the client received a Last-Modified time that still validates the
+        // embedded response as of now, but no longer matches the Last-Modified time of the "main" resource.
+        // Now this client does a revalidation request.
+        $this->request('GET', '/', ['HTTP_IF_MODIFIED_SINCE' => 'Mon, 12 Aug 2024 10:00:00 +0000'], [], true);
+
+        $this->assertSame(200, $this->response->getStatusCode());
+
+        // The cache should use the content ("embedded") from the cached entry
+        $this->assertSame('main embedded', $this->response->getContent());
+
+        $traces = $this->cache->getTraces();
+        $this->assertSame(['fresh'], $traces['GET /']);
+
+        // Check that the embedded resource was successfully revalidated
+        $this->assertSame(['fresh'], $traces['GET /foo']);
     }
 
     public function testEsiCacheForceValidation()
@@ -1241,7 +1566,6 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->request('GET', '/', [], [], true);
         $this->assertEquals('Hello World! My name is Bobby.', $this->response->getContent());
         $this->assertNull($this->response->getTtl());
-        $this->assertTrue($this->response->mustRevalidate());
         $this->assertTrue($this->response->headers->hasCacheControlDirective('private'));
         $this->assertTrue($this->response->headers->hasCacheControlDirective('no-cache'));
     }
@@ -1251,7 +1575,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $responses = [
             [
                 'status' => 200,
-                'body' => 'I am the master response and use expiration caching, but I embed another resource: <esi:include src="/foo" />',
+                'body' => 'I am the main response and use expiration caching, but I embed another resource: <esi:include src="/foo" />',
                 'headers' => [
                     'Cache-Control' => 's-maxage=300',
                     'Surrogate-Control' => 'content="ESI/1.0"',
@@ -1270,9 +1594,8 @@ class HttpCacheTest extends HttpCacheTestCase
 
         // The response has been assembled from expiration and validation based resources
         // This can neither be cached nor revalidated, so it should be private/no cache
-        $this->assertEmpty($this->response->getContent());
+        $this->assertSame('', $this->response->getContent());
         $this->assertNull($this->response->getTtl());
-        $this->assertTrue($this->response->mustRevalidate());
         $this->assertTrue($this->response->headers->hasCacheControlDirective('private'));
         $this->assertTrue($this->response->headers->hasCacheControlDirective('no-cache'));
     }
@@ -1329,7 +1652,7 @@ class HttpCacheTest extends HttpCacheTestCase
         // in decimal number of OCTETs, sent to the recipient or, in the case of the HEAD
         // method, the size of the entity-body that would have been sent had the request
         // been a GET."
-        $this->assertEmpty($this->response->getContent());
+        $this->assertSame('', $this->response->getContent());
         $this->assertEquals(12, $this->response->headers->get('Content-Length'));
     }
 
@@ -1343,12 +1666,10 @@ class HttpCacheTest extends HttpCacheTestCase
         });
     }
 
-    /**
-     * @dataProvider getTrustedProxyData
-     */
+    #[DataProvider('getTrustedProxyData')]
     public function testHttpCacheIsSetAsATrustedProxy(array $existing)
     {
-        Request::setTrustedProxies($existing, Request::HEADER_X_FORWARDED_ALL);
+        Request::setTrustedProxies($existing, Request::HEADER_X_FORWARDED_FOR);
 
         $this->setNextResponse();
         $this->request('GET', '/', ['REMOTE_ADDR' => '10.0.0.1']);
@@ -1363,7 +1684,7 @@ class HttpCacheTest extends HttpCacheTestCase
         Request::setTrustedProxies([], -1);
     }
 
-    public function getTrustedProxyData()
+    public static function getTrustedProxyData()
     {
         return [
             [[]],
@@ -1372,9 +1693,7 @@ class HttpCacheTest extends HttpCacheTestCase
         ];
     }
 
-    /**
-     * @dataProvider getForwardedData
-     */
+    #[DataProvider('getForwardedData')]
     public function testForwarderHeaderForForwardedRequests($forwarded, $expected)
     {
         $this->setNextResponse();
@@ -1392,7 +1711,7 @@ class HttpCacheTest extends HttpCacheTestCase
         Request::setTrustedProxies([], -1);
     }
 
-    public function getForwardedData()
+    public static function getForwardedData()
     {
         return [
             [null, 'for="10.0.0.1";host="localhost";proto=http'],
@@ -1403,7 +1722,7 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testEsiCacheRemoveValidationHeadersIfEmbeddedResponses()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
 
         $responses = [
             [
@@ -1412,7 +1731,7 @@ class HttpCacheTest extends HttpCacheTestCase
                 'headers' => [
                     'Surrogate-Control' => 'content="ESI/1.0"',
                     'ETag' => 'hey',
-                    'Last-Modified' => $time->format(DATE_RFC2822),
+                    'Last-Modified' => $time->format(\DATE_RFC2822),
                 ],
             ],
             [
@@ -1431,7 +1750,7 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testEsiCacheRemoveValidationHeadersIfEmbeddedResponsesAndHeadRequest()
     {
-        $time = \DateTime::createFromFormat('U', time());
+        $time = \DateTimeImmutable::createFromFormat('U', time());
 
         $responses = [
             [
@@ -1440,7 +1759,7 @@ class HttpCacheTest extends HttpCacheTestCase
                 'headers' => [
                     'Surrogate-Control' => 'content="ESI/1.0"',
                     'ETag' => 'hey',
-                    'Last-Modified' => $time->format(DATE_RFC2822),
+                    'Last-Modified' => $time->format(\DATE_RFC2822),
                 ],
             ],
             [
@@ -1453,7 +1772,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $this->setNextResponses($responses);
 
         $this->request('HEAD', '/', [], [], true);
-        $this->assertEmpty($this->response->getContent());
+        $this->assertSame('', $this->response->getContent());
         $this->assertNull($this->response->getETag());
         $this->assertNull($this->response->getLastModified());
     }
@@ -1475,8 +1794,8 @@ class HttpCacheTest extends HttpCacheTestCase
 
     public function testUsesOriginalRequestForSurrogate()
     {
-        $kernel = $this->getMockBuilder('Symfony\Component\HttpKernel\HttpKernelInterface')->getMock();
-        $store = $this->getMockBuilder('Symfony\Component\HttpKernel\HttpCache\StoreInterface')->getMock();
+        $kernel = $this->createMock(HttpKernelInterface::class);
+        $store = $this->createStub(StoreInterface::class);
 
         $kernel
             ->expects($this->exactly(2))
@@ -1496,7 +1815,7 @@ class HttpCacheTest extends HttpCacheTestCase
         $request->server->set('REMOTE_ADDR', '10.0.0.1');
 
         // Main request
-        $cache->handle($request, HttpKernelInterface::MASTER_REQUEST);
+        $cache->handle($request, HttpKernelInterface::MAIN_REQUEST);
 
         // Main request was now modified by HttpCache
         // The surrogate will ask for the request using $this->cache->getRequest()
@@ -1508,18 +1827,338 @@ class HttpCacheTest extends HttpCacheTestCase
         // Surrogate request
         $cache->handle($request, HttpKernelInterface::SUB_REQUEST);
     }
+
+    public function testStaleIfErrorMustNotResetLifetime()
+    {
+        // Make sure we don't accidentally treat the response as fresh (revalidated) again
+        // when stale-if-error handling kicks in.
+
+        $responses = [
+            [
+                'status' => 200,
+                'body' => 'OK',
+                // This is cacheable and can be used in stale-if-error cases:
+                'headers' => ['Cache-Control' => 'public, max-age=10', 'ETag' => 'some-etag'],
+            ],
+            [
+                'status' => 500,
+                'body' => 'FAIL',
+                'headers' => [],
+            ],
+            [
+                'status' => 500,
+                'body' => 'FAIL',
+                'headers' => [],
+            ],
+        ];
+
+        $this->setNextResponses($responses);
+        $this->cacheConfig['stale_if_error'] = 10;
+
+        $this->request('GET', '/'); // warm cache
+
+        sleep(15); // now the entry is stale, but still within the grace period (10s max-age + 10s stale-if-error)
+
+        $this->request('GET', '/'); // hit backend error
+        $this->assertEquals(200, $this->response->getStatusCode()); // stale-if-error saved the day
+        $this->assertEquals(15, $this->response->getAge());
+
+        sleep(10); // now we're outside the grace period
+
+        $this->request('GET', '/'); // hit backend error
+        $this->assertEquals(500, $this->response->getStatusCode()); // fail
+    }
+
+    #[DataProvider('getResponseDataThatMayBeServedStaleIfError')]
+    public function testResponsesThatMayBeUsedStaleIfError($responseHeaders, $sleepBetweenRequests = null)
+    {
+        $responses = [
+            [
+                'status' => 200,
+                'body' => 'OK',
+                'headers' => $responseHeaders,
+            ],
+            [
+                'status' => 500,
+                'body' => 'FAIL',
+                'headers' => [],
+            ],
+        ];
+
+        $this->setNextResponses($responses);
+        $this->cacheConfig['stale_if_error'] = 10; // after stale, may be served for 10s
+
+        $this->request('GET', '/'); // warm cache
+
+        if ($sleepBetweenRequests) {
+            sleep($sleepBetweenRequests);
+        }
+
+        $this->request('GET', '/'); // hit backend error
+
+        $this->assertEquals(200, $this->response->getStatusCode());
+        $this->assertEquals('OK', $this->response->getContent());
+        $this->assertTraceContains('stale-if-error');
+    }
+
+    public static function getResponseDataThatMayBeServedStaleIfError()
+    {
+        // All data sets assume that a 10s stale-if-error grace period has been configured
+        yield 'public, max-age expired' => [['Cache-Control' => 'public, max-age=60'], 65];
+        yield 'public, validateable with ETag, no TTL' => [['Cache-Control' => 'public', 'ETag' => 'some-etag'], 5];
+        yield 'public, validateable with Last-Modified, no TTL' => [['Cache-Control' => 'public', 'Last-Modified' => 'yesterday'], 5];
+        yield 'public, s-maxage will be served stale-if-error, even if the RFC mandates otherwise' => [['Cache-Control' => 'public, s-maxage=20'], 25];
+    }
+
+    #[DataProvider('getResponseDataThatMustNotBeServedStaleIfError')]
+    public function testResponsesThatMustNotBeUsedStaleIfError($responseHeaders, $sleepBetweenRequests = null)
+    {
+        $responses = [
+            [
+                'status' => 200,
+                'body' => 'OK',
+                'headers' => $responseHeaders,
+            ],
+            [
+                'status' => 500,
+                'body' => 'FAIL',
+                'headers' => [],
+            ],
+        ];
+
+        $this->setNextResponses($responses);
+        $this->cacheConfig['stale_if_error'] = 10; // after stale, may be served for 10s
+        $this->cacheConfig['strict_smaxage'] = true; // full RFC compliance for this feature
+
+        $this->request('GET', '/'); // warm cache
+
+        if ($sleepBetweenRequests) {
+            sleep($sleepBetweenRequests);
+        }
+
+        $this->request('GET', '/'); // hit backend error
+
+        $this->assertEquals(500, $this->response->getStatusCode());
+    }
+
+    public function testSkipsConfiguredResponseHeadersForStore()
+    {
+        $storeMock = $this->createMock(StoreInterface::class);
+        $storeMock
+            ->expects($this->once())
+            ->method('write')
+            ->with(
+                $this->isInstanceOf(Request::class),
+                $this->callback(function (Response $response) {
+                    $this->assertFalse($response->headers->has('Set-Cookie'));
+                    $this->assertFalse($response->headers->has('Another-One-To-Skip'));
+                    $this->assertTrue($response->headers->has('Cache-Control'));
+                    $this->assertTrue($response->headers->has('Another-One-To-Keep'));
+
+                    return true;
+                })
+            );
+
+        $this->setNextResponse(200, [
+            'Cache-Control' => 'public, s-maxage=20',
+            'Set-Cookie' => 'foobar=value; path=/',
+            'Another-One-To-Skip' => 'foobar',
+            'Another-One-To-Keep' => 'foobar',
+        ]);
+
+        $httpCache = new HttpCache($this->kernel, $storeMock, null, [
+            'skip_response_headers' => ['Set-Cookie', 'Another-One-To-Skip', 'I-do-Not-Exist'],
+        ]);
+
+        $response = $httpCache->handle(Request::create('/'));
+
+        $this->assertSame('foobar=value; path=/', $response->headers->get('Set-Cookie'));
+        $this->assertSame('foobar', $response->headers->get('Another-One-To-Skip'));
+        $this->assertSame('foobar', $response->headers->get('Another-One-To-Keep'));
+        $this->assertFalse($response->headers->has('I-do-Not-Exist'));
+    }
+
+    public static function getResponseDataThatMustNotBeServedStaleIfError()
+    {
+        // All data sets assume that a 10s stale-if-error grace period has been configured
+        yield 'public, no TTL but beyond grace period' => [['Cache-Control' => 'public'], 15];
+        yield 'public, validateable with ETag, no TTL but beyond grace period' => [['Cache-Control' => 'public', 'ETag' => 'some-etag'], 15];
+        yield 'public, validateable with Last-Modified, no TTL but beyond grace period' => [['Cache-Control' => 'public', 'Last-Modified' => 'yesterday'], 15];
+        yield 'public, stale beyond grace period' => [['Cache-Control' => 'public, max-age=10'], 30];
+
+        // Cache-control values that prohibit serving stale responses or responses without positive validation -
+        // see https://tools.ietf.org/html/rfc7234#section-4.2.4 and
+        // https://tools.ietf.org/html/rfc7234#section-5.2.2
+        yield 'no-cache requires positive validation' => [['Cache-Control' => 'public, no-cache', 'ETag' => 'some-etag']];
+        yield 'no-cache requires positive validation, even if fresh' => [['Cache-Control' => 'public, no-cache, max-age=10']];
+        yield 'must-revalidate requires positive validation once stale' => [['Cache-Control' => 'public, max-age=10, must-revalidate'], 15];
+        yield 'proxy-revalidate requires positive validation once stale' => [['Cache-Control' => 'public, max-age=10, proxy-revalidate'], 15];
+    }
+
+    public function testStaleIfErrorWhenStrictSmaxageDisabled()
+    {
+        $responses = [
+            [
+                'status' => 200,
+                'body' => 'OK',
+                'headers' => ['Cache-Control' => 'public, s-maxage=20'],
+            ],
+            [
+                'status' => 500,
+                'body' => 'FAIL',
+                'headers' => [],
+            ],
+        ];
+
+        $this->setNextResponses($responses);
+        $this->cacheConfig['stale_if_error'] = 10;
+        $this->cacheConfig['strict_smaxage'] = false;
+
+        $this->request('GET', '/'); // warm cache
+        sleep(25);
+        $this->request('GET', '/'); // hit backend error
+
+        $this->assertEquals(200, $this->response->getStatusCode());
+        $this->assertEquals('OK', $this->response->getContent());
+        $this->assertTraceContains('stale-if-error');
+    }
+
+    public function testTraceHeaderNameCanBeChanged()
+    {
+        $this->cacheConfig['trace_header'] = 'X-My-Header';
+        $this->setNextResponse();
+        $this->request('GET', '/');
+
+        $this->assertTrue($this->response->headers->has('X-My-Header'));
+    }
+
+    public function testTraceLevelDefaultsToFullIfDebug()
+    {
+        $this->setNextResponse();
+        $this->request('GET', '/');
+
+        $this->assertTrue($this->response->headers->has('X-Symfony-Cache'));
+        $this->assertEquals('GET /: miss', $this->response->headers->get('X-Symfony-Cache'));
+    }
+
+    public function testTraceLevelDefaultsToNoneIfNotDebug()
+    {
+        $this->cacheConfig['debug'] = false;
+        $this->setNextResponse();
+        $this->request('GET', '/');
+
+        $this->assertFalse($this->response->headers->has('X-Symfony-Cache'));
+    }
+
+    public function testTraceLevelShort()
+    {
+        $this->cacheConfig['trace_level'] = 'short';
+
+        $this->setNextResponse();
+        $this->request('GET', '/');
+
+        $this->assertTrue($this->response->headers->has('X-Symfony-Cache'));
+        $this->assertEquals('miss', $this->response->headers->get('X-Symfony-Cache'));
+    }
+
+    public function testQueryMethodIsCacheable()
+    {
+        $this->setNextResponse(200, ['Cache-Control' => 'public, max-age=10000'], 'Query result', function (Request $request) {
+            $this->assertSame('QUERY', $request->getMethod());
+
+            return '{"query": "users"}' === $request->getContent();
+        });
+
+        $this->kernel->reset();
+        $this->store = $this->createStore();
+        $this->cacheConfig['debug'] = true;
+        $this->cache = new HttpCache($this->kernel, $this->store, null, $this->cacheConfig);
+
+        $request1 = Request::create('/', 'QUERY', [], [], [], [], '{"query": "users"}');
+        $this->response = $this->cache->handle($request1, HttpKernelInterface::MAIN_REQUEST, $this->catch);
+
+        $this->assertSame(200, $this->response->getStatusCode());
+        $this->assertTraceContains('miss');
+        $this->assertSame('Query result', $this->response->getContent());
+
+        $request2 = Request::create('/', 'QUERY', [], [], [], [], '{"query": "users"}');
+        $this->response = $this->cache->handle($request2, HttpKernelInterface::MAIN_REQUEST, $this->catch);
+
+        $this->assertSame(200, $this->response->getStatusCode());
+        $this->assertTrue($this->response->headers->has('Age'));
+        $this->assertSame('Query result', $this->response->getContent());
+    }
+
+    public function testQueryMethodDifferentBodiesCreateDifferentCacheEntries()
+    {
+        $this->setNextResponses([
+            [
+                'status' => 200,
+                'body' => 'Users result',
+                'headers' => ['Cache-Control' => 'public, max-age=10000'],
+            ],
+            [
+                'status' => 200,
+                'body' => 'Posts result',
+                'headers' => ['Cache-Control' => 'public, max-age=10000'],
+            ],
+        ]);
+
+        $this->store = $this->createStore();
+        $this->cacheConfig['debug'] = true;
+        $this->cache = new HttpCache($this->kernel, $this->store, null, $this->cacheConfig);
+
+        $request1 = Request::create('/', 'QUERY', [], [], [], [], '{"query": "users"}');
+        $this->response = $this->cache->handle($request1, HttpKernelInterface::MAIN_REQUEST, $this->catch);
+
+        $this->assertSame('Users result', $this->response->getContent());
+        $this->assertTraceContains('miss');
+
+        $request2 = Request::create('/', 'QUERY', [], [], [], [], '{"query": "posts"}');
+        $this->response = $this->cache->handle($request2, HttpKernelInterface::MAIN_REQUEST, $this->catch);
+
+        $this->assertSame('Posts result', $this->response->getContent());
+        $this->assertTraceContains('miss');
+
+        $request3 = Request::create('/', 'QUERY', [], [], [], [], '{"query": "users"}');
+        $this->response = $this->cache->handle($request3, HttpKernelInterface::MAIN_REQUEST, $this->catch);
+
+        $this->assertSame('Users result', $this->response->getContent());
+        $this->assertTrue($this->response->headers->has('Age'));
+    }
+
+    public function testQueryMethodWithEmptyBodyIsCacheable()
+    {
+        $this->setNextResponse(200, ['Cache-Control' => 'public, max-age=10000'], 'Empty query result');
+        $this->kernel->reset();
+        $this->store = $this->createStore();
+        $this->cacheConfig['debug'] = true;
+        $this->cache = new HttpCache($this->kernel, $this->store, null, $this->cacheConfig);
+
+        $request1 = Request::create('/', 'QUERY', [], [], [], [], '');
+        $this->response = $this->cache->handle($request1, HttpKernelInterface::MAIN_REQUEST, $this->catch);
+
+        $this->assertSame(200, $this->response->getStatusCode());
+        $this->assertTraceContains('miss');
+
+        $request2 = Request::create('/', 'QUERY', [], [], [], [], '');
+        $this->response = $this->cache->handle($request2, HttpKernelInterface::MAIN_REQUEST, $this->catch);
+
+        $this->assertSame(200, $this->response->getStatusCode());
+        $this->assertTrue($this->response->headers->has('Age'));
+    }
 }
 
 class TestKernel implements HttpKernelInterface
 {
-    public $terminateCalled = false;
+    public bool $terminateCalled = false;
 
     public function terminate(Request $request, Response $response)
     {
         $this->terminateCalled = true;
     }
 
-    public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
+    public function handle(Request $request, $type = self::MAIN_REQUEST, $catch = true): Response
     {
     }
 }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,13 +11,12 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 use Monolog\Handler\FingersCrossed\ErrorLevelActivationStrategy;
 use Monolog\Handler\FingersCrossed\ChannelLevelActivationStrategy;
 use Psr\Log\LogLevel;
 
-class FingersCrossedHandlerTest extends TestCase
+class FingersCrossedHandlerTest extends \Monolog\Test\MonologTestCase
 {
     /**
      * @covers Monolog\Handler\FingersCrossedHandler::__construct
@@ -28,14 +27,14 @@ class FingersCrossedHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new FingersCrossedHandler($test);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
         $this->assertFalse($test->hasDebugRecords());
         $this->assertFalse($test->hasInfoRecords());
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $handler->close();
         $this->assertTrue($test->hasInfoRecords());
-        $this->assertTrue(count($test->getRecords()) === 3);
+        $this->assertCount(3, $test->getRecords());
     }
 
     /**
@@ -46,8 +45,8 @@ class FingersCrossedHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new FingersCrossedHandler($test);
-        $handler->handle($this->getRecord(Logger::WARNING));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler->handle($this->getRecord(Level::Warning));
+        $handler->handle($this->getRecord(Level::Debug));
         $handler->close();
         $this->assertTrue($test->hasWarningRecords());
         $this->assertTrue($test->hasDebugRecords());
@@ -61,11 +60,12 @@ class FingersCrossedHandlerTest extends TestCase
     public function testHandleResetBufferingAfterReset()
     {
         $test = new TestHandler();
+        $test->setSkipReset(true);
         $handler = new FingersCrossedHandler($test);
-        $handler->handle($this->getRecord(Logger::WARNING));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler->handle($this->getRecord(Level::Warning));
+        $handler->handle($this->getRecord(Level::Debug));
         $handler->reset();
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler->handle($this->getRecord(Level::Info));
         $handler->close();
         $this->assertTrue($test->hasWarningRecords());
         $this->assertTrue($test->hasDebugRecords());
@@ -79,10 +79,10 @@ class FingersCrossedHandlerTest extends TestCase
     public function testHandleResetBufferingAfterBeingTriggeredWhenStopBufferingIsDisabled()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, Logger::WARNING, 0, false, false);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::WARNING));
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler = new FingersCrossedHandler($test, Level::Warning, 0, false, false);
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Warning));
+        $handler->handle($this->getRecord(Level::Info));
         $handler->close();
         $this->assertTrue($test->hasWarningRecords());
         $this->assertTrue($test->hasDebugRecords());
@@ -96,11 +96,11 @@ class FingersCrossedHandlerTest extends TestCase
     public function testHandleBufferLimit()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, Logger::WARNING, 2);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler = new FingersCrossedHandler($test, Level::Warning, 2);
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertTrue($test->hasWarningRecords());
         $this->assertTrue($test->hasInfoRecords());
         $this->assertFalse($test->hasDebugRecords());
@@ -114,28 +114,30 @@ class FingersCrossedHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new FingersCrossedHandler(function ($record, $handler) use ($test) {
-                    return $test;
-                });
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
+            return $test;
+        });
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
         $this->assertFalse($test->hasDebugRecords());
         $this->assertFalse($test->hasInfoRecords());
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertTrue($test->hasInfoRecords());
-        $this->assertTrue(count($test->getRecords()) === 3);
+        $this->assertCount(3, $test->getRecords());
     }
 
     /**
      * @covers Monolog\Handler\FingersCrossedHandler::handle
      * @covers Monolog\Handler\FingersCrossedHandler::activate
-     * @expectedException RuntimeException
      */
     public function testHandleWithBadCallbackThrowsException()
     {
         $handler = new FingersCrossedHandler(function ($record, $handler) {
-                    return 'foo';
-                });
-        $handler->handle($this->getRecord(Logger::WARNING));
+            return 'foo';
+        });
+
+        $this->expectException(\RuntimeException::class);
+
+        $handler->handle($this->getRecord(Level::Warning));
     }
 
     /**
@@ -144,8 +146,8 @@ class FingersCrossedHandlerTest extends TestCase
     public function testIsHandlingAlways()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, Logger::ERROR);
-        $this->assertTrue($handler->isHandling($this->getRecord(Logger::DEBUG)));
+        $handler = new FingersCrossedHandler($test, Level::Error);
+        $this->assertTrue($handler->isHandling($this->getRecord(Level::Debug)));
     }
 
     /**
@@ -156,10 +158,10 @@ class FingersCrossedHandlerTest extends TestCase
     public function testErrorLevelActivationStrategy()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy(Logger::WARNING));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy(Level::Warning));
+        $handler->handle($this->getRecord(Level::Debug));
         $this->assertFalse($test->hasDebugRecords());
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertTrue($test->hasDebugRecords());
         $this->assertTrue($test->hasWarningRecords());
     }
@@ -173,9 +175,9 @@ class FingersCrossedHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy('warning'));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler->handle($this->getRecord(Level::Debug));
         $this->assertFalse($test->hasDebugRecords());
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertTrue($test->hasDebugRecords());
         $this->assertTrue($test->hasWarningRecords());
     }
@@ -188,11 +190,11 @@ class FingersCrossedHandlerTest extends TestCase
     {
         $test = new TestHandler();
         $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy('warning'));
-        $handler->handle($this->getRecord(Logger::DEBUG));
+        $handler->handle($this->getRecord(Level::Debug));
         $this->assertFalse($test->hasDebugRecords());
         $handler->activate();
         $this->assertTrue($test->hasDebugRecords());
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler->handle($this->getRecord(Level::Info));
         $this->assertTrue($test->hasInfoRecords());
     }
 
@@ -203,11 +205,10 @@ class FingersCrossedHandlerTest extends TestCase
     public function testChannelLevelActivationStrategy()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, new ChannelLevelActivationStrategy(Logger::ERROR, array('othertest' => Logger::DEBUG)));
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler = new FingersCrossedHandler($test, new ChannelLevelActivationStrategy(Level::Error, ['othertest' => Level::Debug]));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertFalse($test->hasWarningRecords());
-        $record = $this->getRecord(Logger::DEBUG);
-        $record['channel'] = 'othertest';
+        $record = $this->getRecord(Level::Debug, channel: 'othertest');
         $handler->handle($record);
         $this->assertTrue($test->hasDebugRecords());
         $this->assertTrue($test->hasWarningRecords());
@@ -220,11 +221,10 @@ class FingersCrossedHandlerTest extends TestCase
     public function testChannelLevelActivationStrategyWithPsrLevels()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, new ChannelLevelActivationStrategy('error', array('othertest' => 'debug')));
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler = new FingersCrossedHandler($test, new ChannelLevelActivationStrategy('error', ['othertest' => 'debug']));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertFalse($test->hasWarningRecords());
-        $record = $this->getRecord(Logger::DEBUG);
-        $record['channel'] = 'othertest';
+        $record = $this->getRecord(Level::Debug, channel: 'othertest');
         $handler->handle($record);
         $this->assertTrue($test->hasDebugRecords());
         $this->assertTrue($test->hasWarningRecords());
@@ -237,13 +237,13 @@ class FingersCrossedHandlerTest extends TestCase
     public function testHandleUsesProcessors()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, Logger::INFO);
+        $handler = new FingersCrossedHandler($test, Level::Info);
         $handler->pushProcessor(function ($record) {
-            $record['extra']['foo'] = true;
+            $record->extra['foo'] = true;
 
             return $record;
         });
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertTrue($test->hasWarningRecords());
         $records = $test->getRecords();
         $this->assertTrue($records[0]['extra']['foo']);
@@ -255,12 +255,14 @@ class FingersCrossedHandlerTest extends TestCase
     public function testPassthruOnClose()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy(Logger::WARNING), 0, true, true, Logger::INFO);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy(Level::Warning), 0, true, true, Level::Info);
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
+        $handler->handle($this->getRecord(Level::Notice));
         $handler->close();
         $this->assertFalse($test->hasDebugRecords());
         $this->assertTrue($test->hasInfoRecords());
+        $this->assertTrue($test->hasNoticeRecords());
     }
 
     /**
@@ -269,11 +271,13 @@ class FingersCrossedHandlerTest extends TestCase
     public function testPsrLevelPassthruOnClose()
     {
         $test = new TestHandler();
-        $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy(Logger::WARNING), 0, true, true, LogLevel::INFO);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler = new FingersCrossedHandler($test, new ErrorLevelActivationStrategy(Level::Warning), 0, true, true, LogLevel::INFO);
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
+        $handler->handle($this->getRecord(Level::Notice));
         $handler->close();
         $this->assertFalse($test->hasDebugRecords());
         $this->assertTrue($test->hasInfoRecords());
+        $this->assertTrue($test->hasNoticeRecords());
     }
 }

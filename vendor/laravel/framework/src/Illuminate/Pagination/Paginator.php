@@ -2,17 +2,28 @@
 
 namespace Illuminate\Pagination;
 
-use Countable;
 use ArrayAccess;
-use JsonSerializable;
-use IteratorAggregate;
-use Illuminate\Support\Collection;
-use Illuminate\Support\HtmlString;
-use Illuminate\Contracts\Support\Jsonable;
-use Illuminate\Contracts\Support\Arrayable;
+use Countable;
 use Illuminate\Contracts\Pagination\Paginator as PaginatorContract;
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Contracts\Support\Jsonable;
+use Illuminate\Support\Collection;
+use IteratorAggregate;
+use JsonSerializable;
 
-class Paginator extends AbstractPaginator implements Arrayable, ArrayAccess, Countable, IteratorAggregate, JsonSerializable, Jsonable, PaginatorContract
+/**
+ * @template TKey of array-key
+ *
+ * @template-covariant TValue
+ *
+ * @extends AbstractPaginator<TKey, TValue>
+ *
+ * @implements Arrayable<TKey, TValue>
+ * @implements ArrayAccess<TKey, TValue>
+ * @implements IteratorAggregate<TKey, TValue>
+ * @implements PaginatorContract<TKey, TValue>
+ */
+class Paginator extends AbstractPaginator implements Arrayable, ArrayAccess, Countable, IteratorAggregate, Jsonable, JsonSerializable, PaginatorContract
 {
     /**
      * Determine if there are more items in the data source.
@@ -24,10 +35,10 @@ class Paginator extends AbstractPaginator implements Arrayable, ArrayAccess, Cou
     /**
      * Create a new paginator instance.
      *
-     * @param  mixed  $items
+     * @param  Collection<TKey, TValue>|Arrayable<TKey, TValue>|iterable<TKey, TValue>  $items
      * @param  int  $perPage
      * @param  int|null  $currentPage
-     * @param  array  $options (path, query, fragment, pageName)
+     * @param  array  $options  (path, query, fragment, pageName)
      * @return void
      */
     public function __construct($items, $perPage, $currentPage = null, array $options = [])
@@ -61,12 +72,12 @@ class Paginator extends AbstractPaginator implements Arrayable, ArrayAccess, Cou
     /**
      * Set the items for the paginator.
      *
-     * @param  mixed  $items
+     * @param  Collection<TKey, TValue>|Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
      * @return void
      */
     protected function setItems($items)
     {
-        $this->items = $items instanceof Collection ? $items : Collection::make($items);
+        $this->items = $items instanceof Collection ? $items : new Collection($items);
 
         $this->hasMore = $this->items->count() > $this->perPage;
 
@@ -102,15 +113,13 @@ class Paginator extends AbstractPaginator implements Arrayable, ArrayAccess, Cou
      *
      * @param  string|null  $view
      * @param  array  $data
-     * @return string
+     * @return \Illuminate\Contracts\Support\Htmlable
      */
     public function render($view = null, $data = [])
     {
-        return new HtmlString(
-            static::viewFactory()->make($view ?: static::$defaultSimpleView, array_merge($data, [
-                'paginator' => $this,
-            ]))->render()
-        );
+        return static::viewFactory()->make($view ?: static::$defaultSimpleView, array_merge($data, [
+            'paginator' => $this,
+        ]));
     }
 
     /**
@@ -149,7 +158,7 @@ class Paginator extends AbstractPaginator implements Arrayable, ArrayAccess, Cou
             'first_page_url' => $this->url(1),
             'from' => $this->firstItem(),
             'next_page_url' => $this->nextPageUrl(),
-            'path' => $this->path,
+            'path' => $this->path(),
             'per_page' => $this->perPage(),
             'prev_page_url' => $this->previousPageUrl(),
             'to' => $this->lastItem(),
@@ -161,7 +170,7 @@ class Paginator extends AbstractPaginator implements Arrayable, ArrayAccess, Cou
      *
      * @return array
      */
-    public function jsonSerialize()
+    public function jsonSerialize(): array
     {
         return $this->toArray();
     }

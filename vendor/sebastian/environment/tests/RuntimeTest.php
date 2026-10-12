@@ -9,119 +9,159 @@
  */
 namespace SebastianBergmann\Environment;
 
+use const PHP_SAPI;
+use const PHP_VERSION;
+use function assert;
+use function in_array;
+use function ini_get;
+use function is_array;
+use function xdebug_info;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \SebastianBergmann\Environment\Runtime
- */
+#[CoversClass(Runtime::class)]
 final class RuntimeTest extends TestCase
 {
-    /**
-     * @var \SebastianBergmann\Environment\Runtime
-     */
-    private $env;
-
-    protected function setUp(): void
+    #[RequiresPhpExtension('xdebug')]
+    public function testCanCollectCodeCoverageWhenXdebugExtensionIsEnabled(): void
     {
-        $this->env = new Runtime;
+        $xdebugMode = xdebug_info('mode');
+
+        assert(is_array($xdebugMode));
+
+        if (in_array('coverage', $xdebugMode, true)) {
+            $this->assertTrue((new Runtime)->canCollectCodeCoverage());
+        } else {
+            $this->assertFalse((new Runtime)->canCollectCodeCoverage());
+        }
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
-    public function testAbilityToCollectCodeCoverageCanBeAssessed(): void
+    #[RequiresPhpExtension('pcov')]
+    public function testCanCollectCodeCoverageWhenPcovExtensionIsEnabled(): void
     {
-        $this->assertIsBool($this->env->canCollectCodeCoverage());
+        $this->assertTrue((new Runtime)->canCollectCodeCoverage());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
+    public function testCanCollectCodeCoverageWhenRunningOnPhpdbg(): void
+    {
+        $this->markTestSkippedWhenNotRunningOnPhpdbg();
+
+        $this->assertTrue((new Runtime)->canCollectCodeCoverage());
+    }
+
     public function testBinaryCanBeRetrieved(): void
     {
-        $this->assertIsString($this->env->getBinary());
+        $this->assertNotEmpty((new Runtime)->getBinary());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
-    public function testCanBeDetected(): void
+    public function testRawBinaryCanBeRetrieved(): void
     {
-        $this->assertIsBool($this->env->isHHVM());
+        $this->assertNotEmpty((new Runtime)->getRawBinary());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
-    public function testCanBeDetected2(): void
+    public function testIsPhpReturnsTrueWhenRunningOnPhp(): void
     {
-        $this->assertIsBool($this->env->isPHP());
+        $this->markTestSkippedWhenRunningOnPhpdbg();
+
+        $this->assertTrue((new Runtime)->isPHP());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
+    #[RequiresPhpExtension('pcov')]
     public function testPCOVCanBeDetected(): void
     {
-        $this->assertIsBool($this->env->hasPCOV());
+        $this->assertTrue((new Runtime)->hasPCOV());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
+    public function testPhpdbgCanBeDetected(): void
+    {
+        $this->markTestSkippedWhenNotRunningOnPhpdbg();
+
+        $this->assertTrue((new Runtime)->hasPHPDBGCodeCoverage());
+    }
+
+    #[RequiresPhpExtension('xdebug')]
     public function testXdebugCanBeDetected(): void
     {
-        $this->assertIsBool($this->env->hasXdebug());
+        $this->markTestSkippedWhenRunningOnPhpdbg();
+
+        $this->assertTrue((new Runtime)->hasXdebug());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
     public function testNameAndVersionCanBeRetrieved(): void
     {
-        $this->assertIsString($this->env->getNameWithVersion());
+        $this->assertNotEmpty((new Runtime)->getNameWithVersion());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
-    public function testNameCanBeRetrieved(): void
+    public function testGetNameReturnsPhpdbgWhenRunningOnPhpdbg(): void
     {
-        $this->assertIsString($this->env->getName());
+        $this->markTestSkippedWhenNotRunningOnPhpdbg();
+
+        $this->assertSame('PHPDBG', (new Runtime)->getName());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
+    public function testGetNameReturnsPhpdbgWhenRunningOnPhp(): void
+    {
+        $this->markTestSkippedWhenRunningOnPhpdbg();
+
+        $this->assertSame('PHP', (new Runtime)->getName());
+    }
+
     public function testNameAndCodeCoverageDriverCanBeRetrieved(): void
     {
-        $this->assertIsString($this->env->getNameWithVersionAndCodeCoverageDriver());
+        $this->assertNotEmpty((new Runtime)->getNameWithVersionAndCodeCoverageDriver());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
-    public function testVersionCanBeRetrieved(): void
+    public function testGetVersionReturnsPhpVersionWhenRunningPhp(): void
     {
-        $this->assertIsString($this->env->getVersion());
+        $this->assertSame(PHP_VERSION, (new Runtime)->getVersion());
     }
 
-    /**
-     * @todo Now that this component is PHP 7-only and uses return type declarations
-     * this test makes even less sense than before
-     */
-    public function testVendorUrlCanBeRetrieved(): void
+    public function testGetVendorUrlReturnsPhpDotNetWhenRunningPhp(): void
     {
-        $this->assertIsString($this->env->getVendorUrl());
+        $this->assertSame('https://www.php.net/', (new Runtime)->getVendorUrl());
+    }
+
+    public function testGetCurrentSettingsReturnsEmptyDiffIfNoValuesArePassed(): void
+    {
+        $this->assertSame([], (new Runtime)->getCurrentSettings([]));
+    }
+
+    #[RequiresPhpExtension('xdebug')]
+    public function testGetCurrentSettingsReturnsCorrectDiffIfXdebugValuesArePassed(): void
+    {
+        if (ini_get('xdebug.mode') === '') {
+            $this->markTestSkipped('xdebug.mode must not be set to "off"');
+        }
+
+        $this->assertArrayHasKey('xdebug.mode', (new Runtime)->getCurrentSettings(['xdebug.mode']));
+    }
+
+    public function testGetCurrentSettingsWillSkipSettingsThatIsNotSet(): void
+    {
+        $this->assertSame([], (new Runtime)->getCurrentSettings(['allow_url_include']));
+    }
+
+    private function markTestSkippedWhenNotRunningOnPhpdbg(): void
+    {
+        if ($this->isRunningOnPhpdbg()) {
+            return;
+        }
+
+        $this->markTestSkipped('PHPDBG is required.');
+    }
+
+    private function markTestSkippedWhenRunningOnPhpdbg(): void
+    {
+        if (!$this->isRunningOnPhpdbg()) {
+            return;
+        }
+
+        $this->markTestSkipped('Cannot run on PHPDBG');
+    }
+
+    private function isRunningOnPhpdbg(): bool
+    {
+        return PHP_SAPI === 'phpdbg';
     }
 }

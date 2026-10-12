@@ -35,7 +35,7 @@ class ConstantsPassTest extends TestCase
      */
     public function shouldAddConstants()
     {
-        $pass = new ConstantsPass;
+        $pass = new ConstantsPass();
         $config = new MockConfiguration(
             array(),
             array(),
@@ -47,6 +47,6 @@ class ConstantsPassTest extends TestCase
             ['ClassWithConstants' => ['FOO' => 'test']]
         );
         $code = $pass->apply(static::CODE, $config);
-        $this->assertContains("const FOO = 'test'", $code);
+        $this->assertTrue(\mb_strpos($code, "const FOO = 'test'") !== false);
     }
 }

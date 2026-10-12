@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,21 +11,20 @@
 
 namespace Monolog\Handler;
 
-use Monolog\Logger;
-use Monolog\TestCase;
+use Monolog\Level;
 
-class MailHandlerTest extends TestCase
+class MailHandlerTest extends \Monolog\Test\MonologTestCase
 {
     /**
      * @covers Monolog\Handler\MailHandler::handleBatch
      */
     public function testHandleBatch()
     {
-        $formatter = $this->getMock('Monolog\\Formatter\\FormatterInterface');
+        $formatter = $this->createMock('Monolog\Formatter\FormatterInterface');
         $formatter->expects($this->once())
             ->method('formatBatch'); // Each record is formatted
 
-        $handler = $this->getMockForAbstractClass('Monolog\\Handler\\MailHandler');
+        $handler = $this->createPartialMock('Monolog\Handler\MailHandler', ['send', 'write']);
         $handler->expects($this->once())
             ->method('send');
         $handler->expects($this->never())
@@ -41,16 +40,16 @@ class MailHandlerTest extends TestCase
      */
     public function testHandleBatchNotSendsMailIfMessagesAreBelowLevel()
     {
-        $records = array(
-            $this->getRecord(Logger::DEBUG, 'debug message 1'),
-            $this->getRecord(Logger::DEBUG, 'debug message 2'),
-            $this->getRecord(Logger::INFO, 'information'),
-        );
+        $records = [
+            $this->getRecord(Level::Debug, 'debug message 1'),
+            $this->getRecord(Level::Debug, 'debug message 2'),
+            $this->getRecord(Level::Info, 'information'),
+        ];
 
-        $handler = $this->getMockForAbstractClass('Monolog\\Handler\\MailHandler');
+        $handler = $this->createPartialMock('Monolog\Handler\MailHandler', ['send']);
         $handler->expects($this->never())
             ->method('send');
-        $handler->setLevel(Logger::ERROR);
+        $handler->setLevel(Level::Error);
 
         $handler->handleBatch($records);
     }
@@ -60,15 +59,15 @@ class MailHandlerTest extends TestCase
      */
     public function testHandle()
     {
-        $handler = $this->getMockForAbstractClass('Monolog\\Handler\\MailHandler');
+        $handler = $this->createPartialMock('Monolog\Handler\MailHandler', ['send']);
+        $handler->setFormatter(new \Monolog\Formatter\LineFormatter);
 
-        $record = $this->getRecord();
-        $records = array($record);
-        $records[0]['formatted'] = '['.$record['datetime']->format('Y-m-d H:i:s').'] test.WARNING: test [] []'."\n";
+        $record = $this->getRecord(message: 'test handle');
+        $record->formatted = '['.$record->datetime.'] test.WARNING: test handle [] []'."\n";
 
         $handler->expects($this->once())
             ->method('send')
-            ->with($records[0]['formatted'], $records);
+            ->with($record->formatted, [$record]);
 
         $handler->handle($record);
     }

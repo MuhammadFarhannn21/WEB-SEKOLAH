@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,12 +11,11 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 
-class DoctrineCouchDBHandlerTest extends TestCase
+class DoctrineCouchDBHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    protected function setup()
+    protected function setUp(): void
     {
         if (!class_exists('Doctrine\CouchDB\CouchDBClient')) {
             $this->markTestSkipped('The "doctrine/couchdb" package is not installed');
@@ -26,21 +25,21 @@ class DoctrineCouchDBHandlerTest extends TestCase
     public function testHandle()
     {
         $client = $this->getMockBuilder('Doctrine\\CouchDB\\CouchDBClient')
-            ->setMethods(array('postDocument'))
+            ->onlyMethods(['postDocument'])
             ->disableOriginalConstructor()
             ->getMock();
 
-        $record = $this->getRecord(Logger::WARNING, 'test', array('data' => new \stdClass, 'foo' => 34));
+        $record = $this->getRecord(Level::Warning, 'test', ['data' => new \stdClass, 'foo' => 34]);
 
-        $expected = array(
+        $expected = [
             'message' => 'test',
-            'context' => array('data' => '[object] (stdClass: {})', 'foo' => 34),
-            'level' => Logger::WARNING,
+            'context' => ['data' => ['stdClass' => []], 'foo' => 34],
+            'level' => Level::Warning->value,
             'level_name' => 'WARNING',
             'channel' => 'test',
-            'datetime' => $record['datetime']->format('Y-m-d H:i:s'),
-            'extra' => array(),
-        );
+            'datetime' => (string) $record->datetime,
+            'extra' => [],
+        ];
 
         $client->expects($this->once())
             ->method('postDocument')

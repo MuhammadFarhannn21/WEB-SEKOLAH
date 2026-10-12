@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,11 +11,12 @@
 
 namespace Monolog\Formatter;
 
-use Monolog\Logger;
+use Monolog\Level;
+use Monolog\Test\MonologTestCase;
 
-class ElasticaFormatterTest extends \PHPUnit_Framework_TestCase
+class ElasticaFormatterTest extends MonologTestCase
 {
-    public function setUp()
+    public function setUp(): void
     {
         if (!class_exists("Elastica\Document")) {
             $this->markTestSkipped("ruflin/elastica not installed");
@@ -30,24 +31,22 @@ class ElasticaFormatterTest extends \PHPUnit_Framework_TestCase
     public function testFormat()
     {
         // test log message
-        $msg = array(
-            'level' => Logger::ERROR,
-            'level_name' => 'ERROR',
-            'channel' => 'meh',
-            'context' => array('foo' => 7, 'bar', 'class' => new \stdClass),
-            'datetime' => new \DateTime("@0"),
-            'extra' => array(),
-            'message' => 'log',
+        $msg = $this->getRecord(
+            Level::Error,
+            'log',
+            channel: 'meh',
+            context: ['foo' => 7, 'bar', 'class' => new \stdClass],
+            datetime: new \DateTimeImmutable("@0"),
         );
 
         // expected values
-        $expected = $msg;
+        $expected = $msg->toArray();
         $expected['datetime'] = '1970-01-01T00:00:00.000000+00:00';
-        $expected['context'] = array(
-            'class' => '[object] (stdClass: {})',
+        $expected['context'] = [
+            'class' => ['stdClass' => []],
             'foo' => 7,
             0 => 'bar',
-        );
+        ];
 
         // format log message
         $formatter = new ElasticaFormatter('my_index', 'doc_type');
@@ -55,9 +54,10 @@ class ElasticaFormatterTest extends \PHPUnit_Framework_TestCase
         $this->assertInstanceOf('Elastica\Document', $doc);
 
         // Document parameters
-        $params = $doc->getParams();
-        $this->assertEquals('my_index', $params['_index']);
-        $this->assertEquals('doc_type', $params['_type']);
+        $this->assertEquals('my_index', $doc->getIndex());
+        if (method_exists($doc, 'getType')) {
+            $this->assertEquals('doc_type', $doc->getType());
+        }
 
         // Document data values
         $data = $doc->getData();

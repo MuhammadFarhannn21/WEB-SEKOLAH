@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,48 +11,48 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 use Monolog\Formatter\LineFormatter;
 
 function error_log()
 {
-    $GLOBALS['error_log'][] = func_get_args();
+    $GLOBALS['error_log'][] = \func_get_args();
 }
 
-class ErrorLogHandlerTest extends TestCase
+class ErrorLogHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    protected function setUp()
+    protected function setUp(): void
     {
-        $GLOBALS['error_log'] = array();
+        $GLOBALS['error_log'] = [];
     }
 
     /**
      * @covers Monolog\Handler\ErrorLogHandler::__construct
-     * @expectedException InvalidArgumentException
-     * @expectedExceptionMessage The given message type "42" is not supported
      */
-    public function testShouldNotAcceptAnInvalidTypeOnContructor()
+    public function testShouldNotAcceptAnInvalidTypeOnConstructor()
     {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The given message type "42" is not supported');
+
         new ErrorLogHandler(42);
     }
 
     /**
      * @covers Monolog\Handler\ErrorLogHandler::write
      */
-    public function testShouldLogMessagesUsingErrorLogFuncion()
+    public function testShouldLogMessagesUsingErrorLogFunction()
     {
         $type = ErrorLogHandler::OPERATING_SYSTEM;
         $handler = new ErrorLogHandler($type);
         $handler->setFormatter(new LineFormatter('%channel%.%level_name%: %message% %context% %extra%', null, true));
-        $handler->handle($this->getRecord(Logger::ERROR, "Foo\nBar\r\n\r\nBaz"));
+        $handler->handle($this->getRecord(Level::Error, "Foo\nBar\r\n\r\nBaz"));
 
         $this->assertSame("test.ERROR: Foo\nBar\r\n\r\nBaz [] []", $GLOBALS['error_log'][0][0]);
         $this->assertSame($GLOBALS['error_log'][0][1], $type);
 
-        $handler = new ErrorLogHandler($type, Logger::DEBUG, true, true);
+        $handler = new ErrorLogHandler($type, Level::Debug, true, true);
         $handler->setFormatter(new LineFormatter(null, null, true));
-        $handler->handle($this->getRecord(Logger::ERROR, "Foo\nBar\r\n\r\nBaz"));
+        $handler->handle($this->getRecord(Level::Error, "Foo\nBar\r\n\r\nBaz"));
 
         $this->assertStringMatchesFormat('[%s] test.ERROR: Foo', $GLOBALS['error_log'][1][0]);
         $this->assertSame($GLOBALS['error_log'][1][1], $type);

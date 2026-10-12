@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /*
  * This file is part of PHPUnit.
  *
@@ -7,11 +7,9 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+namespace PHPUnit\TestFixture;
 
-/**
- * A book.
- */
-class Book
+final class Book
 {
     // the order of properties is important for testing the cycle!
     public $author;

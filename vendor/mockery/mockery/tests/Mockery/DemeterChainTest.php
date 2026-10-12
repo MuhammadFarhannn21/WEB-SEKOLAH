@@ -19,9 +19,7 @@
  * @license    http://github.com/padraic/mockery/blob/master/LICENSE New BSD License
  */
 
-if (version_compare(PHP_VERSION, '7.0.0') >= 0) {
-    require_once __DIR__.'/DummyClasses/DemeterChain.php';
-}
+require_once __DIR__ . '/DummyClasses/DemeterChain.php';
 
 use Mockery\Adapter\Phpunit\MockeryTestCase;
 
@@ -30,12 +28,12 @@ class DemeterChainTest extends MockeryTestCase
     /** @var  Mockery\Mock $this->mock */
     private $mock;
 
-    public function setUp()
+    public function mockeryTestSetUp()
     {
         $this->mock = $this->mock = Mockery::mock()->shouldIgnoreMissing();
     }
 
-    public function tearDown()
+    public function mockeryTestTearDown()
     {
         $this->mock->mockery_getContainer()->mockery_close();
     }
@@ -188,17 +186,25 @@ class DemeterChainTest extends MockeryTestCase
         $this->assertEquals(4, mock2::select()->some()->other()->data());
     }
 
-    /**
-     * @requires PHP 7.0.0
-     */
     public function testDemeterChainsWithClassReturnTypeHints()
     {
         $a = \Mockery::mock(\DemeterChain\A::class);
-        $a->shouldReceive('foo->bar->baz')->andReturn(new stdClass);
+        $a->shouldReceive('foo->bar->baz')->andReturn(new stdClass());
 
         $m = new \DemeterChain\Main();
         $result = $m->callDemeter($a);
 
         $this->assertInstanceOf(stdClass::class, $result);
+    }
+
+    public function testMultipleDemeterChainsWithClassReturnTypeHints()
+    {
+        $bar = new \DemeterChain\C();
+        $qux = new \DemeterChain\C();
+        $a = \Mockery::mock(\DemeterChain\A::class);
+        $a->shouldReceive('foo->bar')->andReturn($bar);
+        $a->shouldReceive('foo->qux')->andReturn($qux);
+        $this->assertEquals($bar, $a->foo()->bar());
+        $this->assertEquals($qux, $a->foo()->qux());
     }
 }

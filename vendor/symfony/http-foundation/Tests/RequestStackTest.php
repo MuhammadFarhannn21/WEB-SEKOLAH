@@ -17,6 +17,13 @@ use Symfony\Component\HttpFoundation\RequestStack;
 
 class RequestStackTest extends TestCase
 {
+    public function testConstruct()
+    {
+        $request = Request::create('/foo');
+        $requestStack = new RequestStack([$request]);
+        $this->assertSame($request, $requestStack->getCurrentRequest());
+    }
+
     public function testGetCurrentRequest()
     {
         $requestStack = new RequestStack();
@@ -33,18 +40,18 @@ class RequestStackTest extends TestCase
         $this->assertNull($requestStack->pop());
     }
 
-    public function testGetMasterRequest()
+    public function testGetMainRequest()
     {
         $requestStack = new RequestStack();
-        $this->assertNull($requestStack->getMasterRequest());
+        $this->assertNull($requestStack->getMainRequest());
 
-        $masterRequest = Request::create('/foo');
+        $mainRequest = Request::create('/foo');
         $subRequest = Request::create('/bar');
 
-        $requestStack->push($masterRequest);
+        $requestStack->push($mainRequest);
         $requestStack->push($subRequest);
 
-        $this->assertSame($masterRequest, $requestStack->getMasterRequest());
+        $this->assertSame($mainRequest, $requestStack->getMainRequest());
     }
 
     public function testGetParentRequest()
@@ -52,19 +59,33 @@ class RequestStackTest extends TestCase
         $requestStack = new RequestStack();
         $this->assertNull($requestStack->getParentRequest());
 
-        $masterRequest = Request::create('/foo');
+        $mainRequest = Request::create('/foo');
 
-        $requestStack->push($masterRequest);
+        $requestStack->push($mainRequest);
         $this->assertNull($requestStack->getParentRequest());
 
         $firstSubRequest = Request::create('/bar');
 
         $requestStack->push($firstSubRequest);
-        $this->assertSame($masterRequest, $requestStack->getParentRequest());
+        $this->assertSame($mainRequest, $requestStack->getParentRequest());
 
         $secondSubRequest = Request::create('/baz');
 
         $requestStack->push($secondSubRequest);
         $this->assertSame($firstSubRequest, $requestStack->getParentRequest());
+    }
+
+    public function testResetRequestFormats()
+    {
+        $requestStack = new RequestStack();
+
+        $request = Request::create('/foo');
+        $request->setFormat('foo', ['application/foo']);
+
+        $this->assertSame(['application/foo'], $request->getMimeTypes('foo'));
+
+        $requestStack->resetRequestFormats();
+
+        $this->assertSame([], $request->getMimeTypes('foo'));
     }
 }

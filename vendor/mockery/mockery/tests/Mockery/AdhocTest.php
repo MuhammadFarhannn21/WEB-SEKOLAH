@@ -26,12 +26,14 @@ use Mockery\Adapter\Phpunit\MockeryTestCase;
  */
 class Mockery_AdhocTest extends MockeryTestCase
 {
-    public function setup()
+    protected $container;
+
+    public function mockeryTestSetUp()
     {
         $this->container = new \Mockery\Container(\Mockery::getDefaultGenerator(), \Mockery::getDefaultLoader());
     }
 
-    public function teardown()
+    public function mockeryTestTearDown()
     {
         $this->container->mockery_close();
     }
@@ -69,7 +71,7 @@ class Mockery_AdhocTest extends MockeryTestCase
     public function testInvalidCountExceptionThrowsRuntimeExceptionOnIllegalComparativeSymbol()
     {
         $this->expectException('Mockery\Exception\RuntimeException');
-        $e = new \Mockery\Exception\InvalidCountException;
+        $e = new \Mockery\Exception\InvalidCountException();
         $e->setExpectedCountComparative('X');
     }
 

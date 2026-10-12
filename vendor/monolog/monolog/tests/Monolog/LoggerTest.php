@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,13 +11,16 @@
 
 namespace Monolog;
 
+use Monolog\Handler\HandlerInterface;
 use Monolog\Processor\WebProcessor;
 use Monolog\Handler\TestHandler;
+use Monolog\Test\MonologTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
-class LoggerTest extends \PHPUnit_Framework_TestCase
+class LoggerTest extends MonologTestCase
 {
     /**
-     * @covers Monolog\Logger::getName
+     * @covers Logger::getName
      */
     public function testGetName()
     {
@@ -26,19 +29,11 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @covers Monolog\Logger::getLevelName
-     */
-    public function testGetLevelName()
-    {
-        $this->assertEquals('ERROR', Logger::getLevelName(Logger::ERROR));
-    }
-
-    /**
-     * @covers Monolog\Logger::withName
+     * @covers Logger::withName
      */
     public function testWithName()
     {
-        $first = new Logger('first', array($handler = new TestHandler()));
+        $first = new Logger('first', [$handler = new TestHandler()]);
         $second = $first->withName('second');
 
         $this->assertSame('first', $first->getName());
@@ -47,40 +42,84 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @covers Monolog\Logger::toMonologLevel
+     * @covers Logger::toMonologLevel
      */
     public function testConvertPSR3ToMonologLevel()
     {
-        $this->assertEquals(Logger::toMonologLevel('debug'), 100);
-        $this->assertEquals(Logger::toMonologLevel('info'), 200);
-        $this->assertEquals(Logger::toMonologLevel('notice'), 250);
-        $this->assertEquals(Logger::toMonologLevel('warning'), 300);
-        $this->assertEquals(Logger::toMonologLevel('error'), 400);
-        $this->assertEquals(Logger::toMonologLevel('critical'), 500);
-        $this->assertEquals(Logger::toMonologLevel('alert'), 550);
-        $this->assertEquals(Logger::toMonologLevel('emergency'), 600);
+        $this->assertEquals(Logger::toMonologLevel('debug'), Level::Debug);
+        $this->assertEquals(Logger::toMonologLevel('info'), Level::Info);
+        $this->assertEquals(Logger::toMonologLevel('notice'), Level::Notice);
+        $this->assertEquals(Logger::toMonologLevel('warning'), Level::Warning);
+        $this->assertEquals(Logger::toMonologLevel('error'), Level::Error);
+        $this->assertEquals(Logger::toMonologLevel('critical'), Level::Critical);
+        $this->assertEquals(Logger::toMonologLevel('alert'), Level::Alert);
+        $this->assertEquals(Logger::toMonologLevel('emergency'), Level::Emergency);
     }
 
     /**
-     * @covers Monolog\Logger::getLevelName
-     * @expectedException InvalidArgumentException
+     * @covers Monolog\Logger::addRecord
+     * @covers Monolog\Logger::log
      */
-    public function testGetLevelNameThrows()
+    public function testConvertRFC5424ToMonologLevelInAddRecordAndLog()
     {
-        Logger::getLevelName(5);
+        $logger = new Logger('test');
+        $handler = new TestHandler;
+        $logger->pushHandler($handler);
+
+        foreach ([
+            7 => 100,
+            6 => 200,
+            5 => 250,
+            4 => 300,
+            3 => 400,
+            2 => 500,
+            1 => 550,
+            0 => 600,
+        ] as $rfc5424Level => $monologLevel) {
+            $handler->reset();
+            $logger->addRecord($rfc5424Level, 'test');
+            $logger->log($rfc5424Level, 'test');
+            $records = $handler->getRecords();
+
+            self::assertCount(2, $records);
+            self::assertSame($monologLevel, $records[0]['level']);
+            self::assertSame($monologLevel, $records[1]['level']);
+        }
     }
 
     /**
-     * @covers Monolog\Logger::__construct
+     * @covers Logger::__construct
      */
     public function testChannel()
     {
         $logger = new Logger('foo');
         $handler = new TestHandler;
         $logger->pushHandler($handler);
-        $logger->addWarning('test');
+        $logger->warning('test');
         list($record) = $handler->getRecords();
-        $this->assertEquals('foo', $record['channel']);
+        $this->assertEquals('foo', $record->channel);
+    }
+
+    /**
+     * @covers Logger::addRecord
+     */
+    public function testLogPreventsCircularLogging()
+    {
+        $logger = new Logger(__METHOD__);
+
+        $loggingHandler = new LoggingHandler($logger);
+        $testHandler = new TestHandler();
+
+        $logger->pushHandler($loggingHandler);
+        $logger->pushHandler($testHandler);
+
+        $logger->addRecord(Level::Alert, 'test');
+
+        $records = $testHandler->getRecords();
+        $this->assertCount(3, $records);
+        $this->assertSame('ALERT', $records[0]->level->getName());
+        $this->assertSame('DEBUG', $records[1]->level->getName());
+        $this->assertSame('WARNING', $records[2]->level->getName());
     }
 
     /**
@@ -90,34 +129,53 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
     {
         $logger = new Logger(__METHOD__);
 
-        $handler = $this->getMock('Monolog\Handler\NullHandler', array('handle'));
-        $handler->expects($this->once())
-            ->method('handle');
+        $handler = $this->getMockBuilder('Monolog\Handler\HandlerInterface')->getMock();
+        $handler->expects($this->never())->method('isHandling');
+        $handler->expects($this->once())->method('handle');
+
         $logger->pushHandler($handler);
 
-        $this->assertTrue($logger->addWarning('test'));
+        $this->assertTrue($logger->addRecord(Level::Warning, 'test'));
     }
 
     /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
-    public function testLogNotHandled()
+    public function testLogAlwaysHandledIfNoProcessorsArePresent()
     {
         $logger = new Logger(__METHOD__);
 
-        $handler = $this->getMock('Monolog\Handler\NullHandler', array('handle'), array(Logger::ERROR));
-        $handler->expects($this->never())
-            ->method('handle');
+        $handler = $this->getMockBuilder('Monolog\Handler\HandlerInterface')->getMock();
+        $handler->expects($this->never())->method('isHandling');
+        $handler->expects($this->once())->method('handle');
+
         $logger->pushHandler($handler);
 
-        $this->assertFalse($logger->addWarning('test'));
+        $this->assertTrue($logger->addRecord(Level::Warning, 'test'));
+    }
+
+    /**
+     * @covers Logger::addRecord
+     */
+    public function testLogNotHandledIfProcessorsArePresent()
+    {
+        $logger = new Logger(__METHOD__);
+
+        $handler = $this->getMockBuilder('Monolog\Handler\HandlerInterface')->getMock();
+        $handler->expects($this->once())->method('isHandling')->willReturn(false);
+        $handler->expects($this->never())->method('handle');
+
+        $logger->pushProcessor(fn (LogRecord $record) => $record);
+        $logger->pushHandler($handler);
+
+        $this->assertFalse($logger->addRecord(Level::Warning, 'test'));
     }
 
     public function testHandlersInCtor()
     {
         $handler1 = new TestHandler;
         $handler2 = new TestHandler;
-        $logger = new Logger(__METHOD__, array($handler1, $handler2));
+        $logger = new Logger(__METHOD__, [$handler1, $handler2]);
 
         $this->assertEquals($handler1, $logger->popHandler());
         $this->assertEquals($handler2, $logger->popHandler());
@@ -127,16 +185,15 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
     {
         $processor1 = new WebProcessor;
         $processor2 = new WebProcessor;
-        $logger = new Logger(__METHOD__, array(), array($processor1, $processor2));
+        $logger = new Logger(__METHOD__, [], [$processor1, $processor2]);
 
         $this->assertEquals($processor1, $logger->popProcessor());
         $this->assertEquals($processor2, $logger->popProcessor());
     }
 
     /**
-     * @covers Monolog\Logger::pushHandler
-     * @covers Monolog\Logger::popHandler
-     * @expectedException LogicException
+     * @covers Logger::pushHandler
+     * @covers Logger::popHandler
      */
     public function testPushPopHandler()
     {
@@ -149,11 +206,14 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals($handler2, $logger->popHandler());
         $this->assertEquals($handler1, $logger->popHandler());
+
+        $this->expectException(\LogicException::class);
+
         $logger->popHandler();
     }
 
     /**
-     * @covers Monolog\Logger::setHandlers
+     * @covers Logger::setHandlers
      */
     public function testSetHandlers()
     {
@@ -162,24 +222,23 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
         $handler2 = new TestHandler;
 
         $logger->pushHandler($handler1);
-        $logger->setHandlers(array($handler2));
+        $logger->setHandlers([$handler2]);
 
         // handler1 has been removed
-        $this->assertEquals(array($handler2), $logger->getHandlers());
+        $this->assertEquals([$handler2], $logger->getHandlers());
 
-        $logger->setHandlers(array(
+        $logger->setHandlers([
             "AMapKey" => $handler1,
             "Woop" => $handler2,
-        ));
+        ]);
 
         // Keys have been scrubbed
-        $this->assertEquals(array($handler1, $handler2), $logger->getHandlers());
+        $this->assertEquals([$handler1, $handler2], $logger->getHandlers());
     }
 
     /**
-     * @covers Monolog\Logger::pushProcessor
-     * @covers Monolog\Logger::popProcessor
-     * @expectedException LogicException
+     * @covers Logger::pushProcessor
+     * @covers Logger::popProcessor
      */
     public function testPushPopProcessor()
     {
@@ -192,22 +251,14 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals($processor2, $logger->popProcessor());
         $this->assertEquals($processor1, $logger->popProcessor());
+
+        $this->expectException(\LogicException::class);
+
         $logger->popProcessor();
     }
 
     /**
-     * @covers Monolog\Logger::pushProcessor
-     * @expectedException InvalidArgumentException
-     */
-    public function testPushProcessorWithNonCallable()
-    {
-        $logger = new Logger(__METHOD__);
-
-        $logger->pushProcessor(new \stdClass());
-    }
-
-    /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
     public function testProcessorsAreExecuted()
     {
@@ -215,99 +266,100 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
         $handler = new TestHandler;
         $logger->pushHandler($handler);
         $logger->pushProcessor(function ($record) {
-            $record['extra']['win'] = true;
+            $record->extra['win'] = true;
 
             return $record;
         });
-        $logger->addError('test');
+        $logger->error('test');
         list($record) = $handler->getRecords();
-        $this->assertTrue($record['extra']['win']);
+        $this->assertTrue($record->extra['win']);
     }
 
     /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
     public function testProcessorsAreCalledOnlyOnce()
     {
         $logger = new Logger(__METHOD__);
-        $handler = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler->expects($this->any())
             ->method('handle')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $logger->pushHandler($handler);
 
         $processor = $this->getMockBuilder('Monolog\Processor\WebProcessor')
             ->disableOriginalConstructor()
-            ->setMethods(array('__invoke'))
+            ->onlyMethods(['__invoke'])
             ->getMock()
         ;
         $processor->expects($this->once())
             ->method('__invoke')
-            ->will($this->returnArgument(0))
+            ->willReturnArgument(0)
         ;
         $logger->pushProcessor($processor);
 
-        $logger->addError('test');
+        $logger->error('test');
     }
 
     /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
     public function testProcessorsNotCalledWhenNotHandled()
     {
         $logger = new Logger(__METHOD__);
-        $handler = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler->expects($this->once())
             ->method('isHandling')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $logger->pushHandler($handler);
         $that = $this;
         $logger->pushProcessor(function ($record) use ($that) {
             $that->fail('The processor should not be called');
         });
-        $logger->addAlert('test');
+        $logger->alert('test');
     }
 
     /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
-    public function testHandlersNotCalledBeforeFirstHandling()
+    public function testHandlersNotCalledBeforeFirstHandlingWhenProcessorsPresent()
     {
         $logger = new Logger(__METHOD__);
+        $logger->pushProcessor(fn ($record) => $record);
 
-        $handler1 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler1 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler1->expects($this->never())
             ->method('isHandling')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $handler1->expects($this->once())
             ->method('handle')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $logger->pushHandler($handler1);
 
-        $handler2 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler2 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler2->expects($this->once())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler2->expects($this->once())
             ->method('handle')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $logger->pushHandler($handler2);
 
-        $handler3 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler3 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler3->expects($this->once())
             ->method('isHandling')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $handler3->expects($this->never())
             ->method('handle')
         ;
@@ -317,237 +369,289 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
-    public function testHandlersNotCalledBeforeFirstHandlingWithAssocArray()
+    public function testHandlersNotCalledBeforeFirstHandlingWhenProcessorsPresentWithAssocArray()
     {
-        $handler1 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler1 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler1->expects($this->never())
             ->method('isHandling')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $handler1->expects($this->once())
             ->method('handle')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
 
-        $handler2 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler2 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler2->expects($this->once())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler2->expects($this->once())
             ->method('handle')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
 
-        $handler3 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler3 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler3->expects($this->once())
             ->method('isHandling')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $handler3->expects($this->never())
             ->method('handle')
         ;
 
-        $logger = new Logger(__METHOD__, array('last' => $handler3, 'second' => $handler2, 'first' => $handler1));
+        $logger = new Logger(__METHOD__, ['last' => $handler3, 'second' => $handler2, 'first' => $handler1]);
+        $logger->pushProcessor(fn ($record) => $record);
 
         $logger->debug('test');
     }
 
     /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
     public function testBubblingWhenTheHandlerReturnsFalse()
     {
         $logger = new Logger(__METHOD__);
 
-        $handler1 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler1 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler1->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler1->expects($this->once())
             ->method('handle')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $logger->pushHandler($handler1);
 
-        $handler2 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler2 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler2->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler2->expects($this->once())
             ->method('handle')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
+
         $logger->pushHandler($handler2);
 
         $logger->debug('test');
     }
 
     /**
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::addRecord
      */
     public function testNotBubblingWhenTheHandlerReturnsTrue()
     {
         $logger = new Logger(__METHOD__);
 
-        $handler1 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler1 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler1->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler1->expects($this->never())
             ->method('handle')
         ;
         $logger->pushHandler($handler1);
 
-        $handler2 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler2 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler2->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler2->expects($this->once())
             ->method('handle')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $logger->pushHandler($handler2);
 
         $logger->debug('test');
     }
 
     /**
-     * @covers Monolog\Logger::isHandling
+     * @covers Logger::isHandling
      */
     public function testIsHandling()
     {
         $logger = new Logger(__METHOD__);
 
-        $handler1 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler1 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler1->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(false))
-        ;
+            ->willReturn(false);
 
         $logger->pushHandler($handler1);
-        $this->assertFalse($logger->isHandling(Logger::DEBUG));
+        $this->assertFalse($logger->isHandling(Level::Debug));
 
-        $handler2 = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler2 = $this->createMock('Monolog\Handler\HandlerInterface');
         $handler2->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
 
         $logger->pushHandler($handler2);
-        $this->assertTrue($logger->isHandling(Logger::DEBUG));
+        $this->assertTrue($logger->isHandling(Level::Debug));
     }
 
     /**
-     * @dataProvider logMethodProvider
-     * @covers Monolog\Logger::addDebug
-     * @covers Monolog\Logger::addInfo
-     * @covers Monolog\Logger::addNotice
-     * @covers Monolog\Logger::addWarning
-     * @covers Monolog\Logger::addError
-     * @covers Monolog\Logger::addCritical
-     * @covers Monolog\Logger::addAlert
-     * @covers Monolog\Logger::addEmergency
-     * @covers Monolog\Logger::debug
-     * @covers Monolog\Logger::info
-     * @covers Monolog\Logger::notice
-     * @covers Monolog\Logger::warn
-     * @covers Monolog\Logger::err
-     * @covers Monolog\Logger::crit
-     * @covers Monolog\Logger::alert
-     * @covers Monolog\Logger::emerg
+     * @covers Level::Debug
+     * @covers Level::Info
+     * @covers Level::Notice
+     * @covers Level::Warning
+     * @covers Level::Error
+     * @covers Level::Critical
+     * @covers Level::Alert
+     * @covers Level::Emergency
      */
-    public function testLogMethods($method, $expectedLevel)
+    #[DataProvider('logMethodProvider')]
+    public function testLogMethods(string $method, Level $expectedLevel)
     {
         $logger = new Logger('foo');
         $handler = new TestHandler;
         $logger->pushHandler($handler);
         $logger->{$method}('test');
         list($record) = $handler->getRecords();
-        $this->assertEquals($expectedLevel, $record['level']);
+        $this->assertEquals($expectedLevel, $record->level);
     }
 
-    public function logMethodProvider()
+    public static function logMethodProvider()
     {
-        return array(
-            // monolog methods
-            array('addDebug',     Logger::DEBUG),
-            array('addInfo',      Logger::INFO),
-            array('addNotice',    Logger::NOTICE),
-            array('addWarning',   Logger::WARNING),
-            array('addError',     Logger::ERROR),
-            array('addCritical',  Logger::CRITICAL),
-            array('addAlert',     Logger::ALERT),
-            array('addEmergency', Logger::EMERGENCY),
-
-            // ZF/Sf2 compat methods
-            array('debug',  Logger::DEBUG),
-            array('info',   Logger::INFO),
-            array('notice', Logger::NOTICE),
-            array('warn',   Logger::WARNING),
-            array('err',    Logger::ERROR),
-            array('crit',   Logger::CRITICAL),
-            array('alert',  Logger::ALERT),
-            array('emerg',  Logger::EMERGENCY),
-        );
+        return [
+            // PSR-3 methods
+            ['debug',  Level::Debug],
+            ['info',   Level::Info],
+            ['notice', Level::Notice],
+            ['warning',   Level::Warning],
+            ['error',    Level::Error],
+            ['critical',   Level::Critical],
+            ['alert',  Level::Alert],
+            ['emergency',  Level::Emergency],
+        ];
     }
 
     /**
-     * @dataProvider setTimezoneProvider
-     * @covers Monolog\Logger::setTimezone
+     * @covers Logger::setTimezone
      */
+    #[DataProvider('setTimezoneProvider')]
     public function testSetTimezone($tz)
     {
-        Logger::setTimezone($tz);
         $logger = new Logger('foo');
+        $logger->setTimezone($tz);
         $handler = new TestHandler;
         $logger->pushHandler($handler);
         $logger->info('test');
         list($record) = $handler->getRecords();
-        $this->assertEquals($tz, $record['datetime']->getTimezone());
+        $this->assertEquals($tz, $record->datetime->getTimezone());
     }
 
-    public function setTimezoneProvider()
+    public static function setTimezoneProvider()
     {
         return array_map(
-            function ($tz) { return array(new \DateTimeZone($tz)); },
+            function ($tz) {
+                return [new \DateTimeZone($tz)];
+            },
             \DateTimeZone::listIdentifiers()
         );
     }
 
     /**
-     * @dataProvider useMicrosecondTimestampsProvider
-     * @covers Monolog\Logger::useMicrosecondTimestamps
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::setTimezone
+     * @covers JsonSerializableDateTimeImmutable::__construct
      */
-    public function testUseMicrosecondTimestamps($micro, $assert)
+    public function testTimezoneIsRespectedInUTC()
     {
+        foreach ([true, false] as $microseconds) {
+            $logger = new Logger('foo');
+            $logger->useMicrosecondTimestamps($microseconds);
+            $tz = new \DateTimeZone('America/New_York');
+            $logger->setTimezone($tz);
+            $handler = new TestHandler;
+            $logger->pushHandler($handler);
+            $dt = new \DateTime('now', $tz);
+            $logger->info('test');
+            list($record) = $handler->getRecords();
+
+            $this->assertEquals($tz, $record->datetime->getTimezone());
+            $this->assertEquals($dt->format('Y/m/d H:i'), $record->datetime->format('Y/m/d H:i'), 'Time should match timezone with microseconds set to: '.var_export($microseconds, true));
+        }
+    }
+
+    /**
+     * @covers Logger::setTimezone
+     * @covers JsonSerializableDateTimeImmutable::__construct
+     */
+    public function testTimezoneIsRespectedInOtherTimezone()
+    {
+        date_default_timezone_set('CET');
+        foreach ([true, false] as $microseconds) {
+            $logger = new Logger('foo');
+            $logger->useMicrosecondTimestamps($microseconds);
+            $tz = new \DateTimeZone('America/New_York');
+            $logger->setTimezone($tz);
+            $handler = new TestHandler;
+            $logger->pushHandler($handler);
+            $dt = new \DateTime('now', $tz);
+            $logger->info('test');
+            list($record) = $handler->getRecords();
+
+            $this->assertEquals($tz, $record->datetime->getTimezone());
+            $this->assertEquals($dt->format('Y/m/d H:i'), $record->datetime->format('Y/m/d H:i'), 'Time should match timezone with microseconds set to: '.var_export($microseconds, true));
+        }
+    }
+
+    public function tearDown(): void
+    {
+        date_default_timezone_set('UTC');
+    }
+
+    /**
+     * @covers Logger::useMicrosecondTimestamps
+     * @covers Logger::addRecord
+     */
+    #[DataProvider('useMicrosecondTimestampsProvider')]
+    public function testUseMicrosecondTimestamps($micro, $assert, $assertFormat)
+    {
+        if (PHP_VERSION_ID === 70103) {
+            $this->markTestSkipped();
+        }
+
         $logger = new Logger('foo');
         $logger->useMicrosecondTimestamps($micro);
         $handler = new TestHandler;
         $logger->pushHandler($handler);
         $logger->info('test');
         list($record) = $handler->getRecords();
-        $this->{$assert}('000000', $record['datetime']->format('u'));
+        $this->{$assert}('000000', $record->datetime->format('u'));
+        $this->assertSame($record->datetime->format($assertFormat), (string) $record->datetime);
     }
 
-    public function useMicrosecondTimestampsProvider()
+    public static function useMicrosecondTimestampsProvider()
     {
-        return array(
+        return [
             // this has a very small chance of a false negative (1/10^6)
-            'with microseconds' => array(true, 'assertNotSame'),
-            'without microseconds' => array(false, PHP_VERSION_ID >= 70100 ? 'assertNotSame' : 'assertSame'),
-        );
+            'with microseconds' => [true, 'assertNotSame', 'Y-m-d\TH:i:s.uP'],
+            // php 7.1 always includes microseconds, so we keep them in, but we format the datetime without
+            'without microseconds' => [false, 'assertNotSame', 'Y-m-d\TH:i:sP'],
+        ];
+    }
+
+    public function testProcessorsDoNotInterfereBetweenHandlers()
+    {
+        $logger = new Logger('foo');
+        $logger->pushHandler($t1 = new TestHandler());
+        $logger->pushHandler($t2 = new TestHandler());
+        $t1->pushProcessor(function (LogRecord $record) {
+            $record->extra['foo'] = 'bar';
+
+            return $record;
+        });
+        $logger->error('Foo');
+
+        self::assertSame([], $t2->getRecords()[0]->extra);
     }
 
     /**
-     * @covers Monolog\Logger::setExceptionHandler
+     * @covers Logger::setExceptionHandler
      */
     public function testSetExceptionHandler()
     {
@@ -560,38 +664,30 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @covers Monolog\Logger::setExceptionHandler
-     * @expectedException InvalidArgumentException
-     */
-    public function testBadExceptionHandlerType()
-    {
-        $logger = new Logger(__METHOD__);
-        $logger->setExceptionHandler(false);
-    }
-
-    /**
-     * @covers Monolog\Logger::handleException
-     * @expectedException Exception
+     * @covers Logger::handleException
      */
     public function testDefaultHandleException()
     {
         $logger = new Logger(__METHOD__);
-        $handler = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler = $this->getMockBuilder('Monolog\Handler\HandlerInterface')->getMock();
         $handler->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler->expects($this->any())
             ->method('handle')
             ->will($this->throwException(new \Exception('Some handler exception')))
         ;
+
+        $this->expectException(\Exception::class);
+
         $logger->pushHandler($handler);
         $logger->info('test');
     }
 
     /**
-     * @covers Monolog\Logger::handleException
-     * @covers Monolog\Logger::addRecord
+     * @covers Logger::handleException
+     * @covers Logger::addRecord
      */
     public function testCustomHandleException()
     {
@@ -599,14 +695,14 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
         $that = $this;
         $logger->setExceptionHandler(function ($e, $record) use ($that) {
             $that->assertEquals($e->getMessage(), 'Some handler exception');
-            $that->assertTrue(is_array($record));
-            $that->assertEquals($record['message'], 'test');
+            $that->assertInstanceOf(LogRecord::class, $record);
+            $that->assertEquals($record->message, 'test');
         });
-        $handler = $this->getMock('Monolog\Handler\HandlerInterface');
+        $handler = $this->getMockBuilder('Monolog\Handler\HandlerInterface')->getMock();
         $handler->expects($this->any())
             ->method('isHandling')
-            ->will($this->returnValue(true))
-        ;
+            ->willReturn(true);
+
         $handler->expects($this->any())
             ->method('handle')
             ->will($this->throwException(new \Exception('Some handler exception')))
@@ -615,13 +711,24 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
         $logger->info('test');
     }
 
+    public function testSerializable()
+    {
+        $logger = new Logger(__METHOD__);
+        $copy = unserialize(serialize($logger));
+        self::assertInstanceOf(Logger::class, $copy);
+        self::assertSame($logger->getName(), $copy->getName());
+        self::assertSame($logger->getTimezone()->getName(), $copy->getTimezone()->getName());
+        self::assertSame($logger->getHandlers(), $copy->getHandlers());
+    }
+
     public function testReset()
     {
         $logger = new Logger('app');
 
         $testHandler = new Handler\TestHandler();
+        $testHandler->setSkipReset(true);
         $bufferHandler = new Handler\BufferHandler($testHandler);
-        $groupHandler = new Handler\GroupHandler(array($bufferHandler));
+        $groupHandler = new Handler\GroupHandler([$bufferHandler]);
         $fingersCrossedHandler = new Handler\FingersCrossedHandler($groupHandler);
 
         $logger->pushHandler($fingersCrossedHandler);
@@ -635,21 +742,19 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
         $logger->pushProcessor($processorUid2);
 
         $getProperty = function ($object, $property) {
-            $reflectionProperty = new \ReflectionProperty(get_class($object), $property);
-            $reflectionProperty->setAccessible(true);
+            $reflectionProperty = new \ReflectionProperty(\get_class($object), $property);
 
             return $reflectionProperty->getValue($object);
         };
-        $that = $this;
-        $assertBufferOfBufferHandlerEmpty = function () use ($getProperty, $bufferHandler, $that) {
-            $that->assertEmpty($getProperty($bufferHandler, 'buffer'));
+        $assertBufferOfBufferHandlerEmpty = function () use ($getProperty, $bufferHandler) {
+            self::assertEmpty($getProperty($bufferHandler, 'buffer'));
         };
-        $assertBuffersEmpty = function() use ($assertBufferOfBufferHandlerEmpty, $getProperty, $fingersCrossedHandler, $that) {
+        $assertBuffersEmpty = function () use ($assertBufferOfBufferHandlerEmpty, $getProperty, $fingersCrossedHandler) {
             $assertBufferOfBufferHandlerEmpty();
-            $that->assertEmpty($getProperty($fingersCrossedHandler, 'buffer'));
+            self::assertEmpty($getProperty($fingersCrossedHandler, 'buffer'));
         };
 
-        $logger->debug('debug');
+        $logger->debug('debug1');
         $logger->reset();
         $assertBuffersEmpty();
         $this->assertFalse($testHandler->hasDebugRecords());
@@ -657,16 +762,16 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
         $this->assertNotSame($uid1, $uid1 = $processorUid1->getUid());
         $this->assertNotSame($uid2, $uid2 = $processorUid2->getUid());
 
-        $logger->debug('debug');
-        $logger->error('error');
+        $logger->debug('debug2');
+        $logger->error('error2');
         $logger->reset();
         $assertBuffersEmpty();
-        $this->assertTrue($testHandler->hasDebugRecords());
-        $this->assertTrue($testHandler->hasErrorRecords());
+        $this->assertTrue($testHandler->hasRecordThatContains('debug2', Level::Debug));
+        $this->assertTrue($testHandler->hasRecordThatContains('error2', Level::Error));
         $this->assertNotSame($uid1, $uid1 = $processorUid1->getUid());
         $this->assertNotSame($uid2, $uid2 = $processorUid2->getUid());
 
-        $logger->info('info');
+        $logger->info('info3');
         $this->assertNotEmpty($getProperty($fingersCrossedHandler, 'buffer'));
         $assertBufferOfBufferHandlerEmpty();
         $this->assertFalse($testHandler->hasInfoRecords());
@@ -677,14 +782,138 @@ class LoggerTest extends \PHPUnit_Framework_TestCase
         $this->assertNotSame($uid1, $uid1 = $processorUid1->getUid());
         $this->assertNotSame($uid2, $uid2 = $processorUid2->getUid());
 
-        $logger->notice('notice');
-        $logger->emergency('emergency');
+        $logger->notice('notice4');
+        $logger->emergency('emergency4');
         $logger->reset();
         $assertBuffersEmpty();
         $this->assertFalse($testHandler->hasInfoRecords());
-        $this->assertTrue($testHandler->hasNoticeRecords());
-        $this->assertTrue($testHandler->hasEmergencyRecords());
+        $this->assertTrue($testHandler->hasRecordThatContains('notice4', Level::Notice));
+        $this->assertTrue($testHandler->hasRecordThatContains('emergency4', Level::Emergency));
         $this->assertNotSame($uid1, $processorUid1->getUid());
         $this->assertNotSame($uid2, $processorUid2->getUid());
+    }
+
+    /**
+     * @covers Logger::addRecord
+     */
+    public function testLogWithDateTime()
+    {
+        foreach ([true, false] as $microseconds) {
+            $logger = new Logger(__METHOD__);
+
+            $loggingHandler = new LoggingHandler($logger);
+            $testHandler = new TestHandler();
+
+            $logger->pushHandler($loggingHandler);
+            $logger->pushHandler($testHandler);
+
+            $datetime = (new JsonSerializableDateTimeImmutable($microseconds))->modify('2022-03-04 05:06:07');
+            $logger->addRecord(Level::Debug, 'test', [], $datetime);
+
+            list($record) = $testHandler->getRecords();
+            $this->assertEquals($datetime->format('Y-m-d H:i:s'), $record->datetime->format('Y-m-d H:i:s'));
+        }
+    }
+
+    public function testLogCycleDetectionWithFibersWithoutCycle()
+    {
+        $logger = new Logger(__METHOD__);
+
+        $fiberSuspendHandler = new FiberSuspendHandler();
+        $testHandler = new TestHandler();
+
+        $logger->pushHandler($fiberSuspendHandler);
+        $logger->pushHandler($testHandler);
+
+        $fibers = [];
+        for ($i = 0; $i < 10; $i++) {
+            $fiber = new \Fiber(static function () use ($logger) {
+                $logger->info('test');
+            });
+
+            $fiber->start();
+
+            // We need to keep a reference here, because otherwise the fiber gets automatically cleaned up
+            $fibers[] = $fiber;
+        }
+
+        self::assertCount(10, $testHandler->getRecords());
+    }
+
+    public function testLogCycleDetectionWithFibersWithCycle()
+    {
+        $logger = new Logger(__METHOD__);
+
+        $fiberSuspendHandler = new FiberSuspendHandler();
+        $loggingHandler = new LoggingHandler($logger);
+        $testHandler = new TestHandler();
+
+        $logger->pushHandler($fiberSuspendHandler);
+        $logger->pushHandler($loggingHandler);
+        $logger->pushHandler($testHandler);
+
+        $fiber = new \Fiber(static function () use ($logger) {
+            $logger->info('test');
+        });
+
+        $fiber->start();
+
+        self::assertCount(3, $testHandler->getRecords());
+    }
+}
+
+class LoggingHandler implements HandlerInterface
+{
+    /**
+     * @var Logger
+     */
+    private $logger;
+
+    public function __construct(Logger $logger)
+    {
+        $this->logger = $logger;
+    }
+
+    public function isHandling(LogRecord $record): bool
+    {
+        return true;
+    }
+
+    public function handle(LogRecord $record): bool
+    {
+        $this->logger->debug('Log triggered while logging');
+
+        return false;
+    }
+
+    public function handleBatch(array $records): void
+    {
+    }
+
+    public function close(): void
+    {
+    }
+}
+
+class FiberSuspendHandler implements HandlerInterface
+{
+    public function isHandling(LogRecord $record): bool
+    {
+        return true;
+    }
+
+    public function handle(LogRecord $record): bool
+    {
+        \Fiber::suspend();
+
+        return true;
+    }
+
+    public function handleBatch(array $records): void
+    {
+    }
+
+    public function close(): void
+    {
     }
 }

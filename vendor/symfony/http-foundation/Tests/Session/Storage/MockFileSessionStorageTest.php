@@ -23,29 +23,21 @@ use Symfony\Component\HttpFoundation\Session\Storage\MockFileSessionStorage;
  */
 class MockFileSessionStorageTest extends TestCase
 {
-    /**
-     * @var string
-     */
-    private $sessionDir;
+    protected MockFileSessionStorage $storage;
 
-    /**
-     * @var MockFileSessionStorage
-     */
-    protected $storage;
+    private string $sessionDir;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->sessionDir = sys_get_temp_dir().'/sftest';
         $this->storage = $this->getStorage();
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
-        $this->sessionDir = null;
-        $this->storage = null;
-        array_map('unlink', glob($this->sessionDir.'/*.session'));
+        array_map('unlink', glob($this->sessionDir.'/*'));
         if (is_dir($this->sessionDir)) {
-            rmdir($this->sessionDir);
+            @rmdir($this->sessionDir);
         }
     }
 
@@ -107,16 +99,14 @@ class MockFileSessionStorageTest extends TestCase
         $this->assertEquals('bar', $storage2->getBag('attributes')->get('foo'), 'values persist between instances');
     }
 
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testSaveWithoutStart()
     {
+        $this->expectException(\RuntimeException::class);
         $storage1 = $this->getStorage();
         $storage1->save();
     }
 
-    private function getStorage()
+    private function getStorage(): MockFileSessionStorage
     {
         $storage = new MockFileSessionStorage($this->sessionDir);
         $storage->registerBag(new FlashBag());

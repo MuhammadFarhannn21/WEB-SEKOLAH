@@ -169,8 +169,9 @@ return [
         RealRashid\SweetAlert\SweetAlertServiceProvider::class,
         Maatwebsite\Excel\ExcelServiceProvider::class,
         Barryvdh\DomPDF\ServiceProvider::class,
-        Collective\Html\HtmlServiceProvider::class,
-        Intervention\Image\ImageServiceProvider::class,
+        //Collective\Html\HtmlServiceProvider::class,
+        //Intervention\Image\ImageServiceProvider::class,
+        Intervention\Image\Laravel\ServiceProvider::class,
         Unisharp\Laravelfilemanager\LaravelFilemanagerServiceProvider::class,
 
         /*
@@ -213,6 +214,7 @@ return [
         'File' => Illuminate\Support\Facades\File::class,
         'Gate' => Illuminate\Support\Facades\Gate::class,
         'Hash' => Illuminate\Support\Facades\Hash::class,
+        'Image' => Intervention\Image\Laravel\Facades\Image::class,
         'Lang' => Illuminate\Support\Facades\Lang::class,
         'Log' => Illuminate\Support\Facades\Log::class,
         'Mail' => Illuminate\Support\Facades\Mail::class,
@@ -230,7 +232,7 @@ return [
         'URL' => Illuminate\Support\Facades\URL::class,
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View' => Illuminate\Support\Facades\View::class,
-        'Form' => Collective\Html\FormFacade::class,
+        //'Form' => Collective\Html\FormFacade::class,
         'Alert' => RealRashid\SweetAlert\Facades\Alert::class,
         'Excel' => Maatwebsite\Excel\Facades\Excel::class,
         'PDF' => Barryvdh\DomPDF\Facade::class,

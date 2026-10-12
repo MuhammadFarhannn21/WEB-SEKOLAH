@@ -7,15 +7,31 @@ use PHPUnit\Framework\TestCase;
  * @covers \TheSeer\Tokenizer\Tokenizer
  */
 class TokenizerTest extends TestCase {
+    public function testValidSourceGetsParsed(): void {
+        $this->assertParsedTokensMatchFixture('test.php');
+    }
 
-    public function testValidSourceGetsParsed() {
-        $tokenizer = new Tokenizer();
-        $result = $tokenizer->parse(file_get_contents(__DIR__ . '/_files/test.php'));
-
-        $expected = unserialize(
-            file_get_contents(__DIR__ . '/_files/test.php.tokens'),
-            [TokenCollection::class]
+    public function testParsingEmptyStringReturnsEmptyCollection(): void {
+        $this->assertCount(
+            0,
+            (new Tokenizer())->parse('')
         );
-        $this->assertEquals($expected, $result);
+    }
+
+    /**
+     * @ticket https://github.com/theseer/tokenizer/issues/13
+     */
+    public function testFileWithSingleEmptyLineGetsParsed(): void {
+        $this->assertParsedTokensMatchFixture('source_with_single_empty_line.php');
+    }
+
+    private function assertParsedTokensMatchFixture(string $fixture): void {
+        $expected = \unserialize(
+            \file_get_contents(__DIR__ . '/_files/' . $fixture . '.tokens'),
+            [TokenCollection::class, Token::class]
+        );
+
+        $actual = (new Tokenizer)->parse(\file_get_contents(__DIR__ . '/_files/' . $fixture));
+        $this->assertEquals($expected, $actual);
     }
 }

@@ -44,5 +44,7 @@ class Aplikasi extends Model
         'jumlah_guru',
         'jumlah_prestasi',
         'jumlah_jurusan',
+        'visi',
+        'misi',
     ];
 }

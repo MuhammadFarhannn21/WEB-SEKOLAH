@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /*
  * This file is part of sebastian/comparator.
  *
@@ -15,9 +15,7 @@ namespace SebastianBergmann\Comparator;
 class SampleClass
 {
     public $a;
-
     protected $b;
-
     protected $c;
 
     public function __construct($a, $b, $c)

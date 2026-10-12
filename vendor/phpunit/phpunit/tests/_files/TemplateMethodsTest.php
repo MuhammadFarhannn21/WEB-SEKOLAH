@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /*
  * This file is part of PHPUnit.
  *
@@ -7,9 +7,12 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-use PHPUnit\Framework\TestCase;
+namespace PHPUnit\TestFixture;
 
-class TemplateMethodsTest extends TestCase
+use PHPUnit\Framework\TestCase;
+use Throwable;
+
+final class TemplateMethodsTest extends TestCase
 {
     public static function setUpBeforeClass(): void
     {
@@ -22,6 +25,16 @@ class TemplateMethodsTest extends TestCase
     }
 
     protected function setUp(): void
+    {
+        print __METHOD__ . "\n";
+    }
+
+    protected function assertPreConditions(): void
+    {
+        print __METHOD__ . "\n";
+    }
+
+    protected function assertPostConditions(): void
     {
         print __METHOD__ . "\n";
     }
@@ -41,16 +54,6 @@ class TemplateMethodsTest extends TestCase
     {
         print __METHOD__ . "\n";
         $this->assertTrue(false);
-    }
-
-    protected function assertPreConditions(): void
-    {
-        print __METHOD__ . "\n";
-    }
-
-    protected function assertPostConditions(): void
-    {
-        print __METHOD__ . "\n";
     }
 
     protected function onNotSuccessfulTest(Throwable $t): void

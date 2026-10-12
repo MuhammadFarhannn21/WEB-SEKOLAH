@@ -1,10 +1,9 @@
 includes:
-    - ./vendor/nunomaduro/larastan/extension.neon
+    - ./vendor/larastan/larastan/extension.neon
+    - ./phpstan-baseline.neon
+    
 parameters:
     level: max
     paths:
         - src
-    reportUnmatchedIgnoredErrors: false
-    ignoreErrors:
-        - '#Call to an undefined method Illuminate\\Contracts\\Debug\\ExceptionHandler::shouldReport().#'
-        - '#Parameter \#1 \$input of function str_pad expects string, int given.#'
+    reportUnmatchedIgnoredErrors: true

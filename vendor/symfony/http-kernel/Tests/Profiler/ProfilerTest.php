@@ -21,13 +21,14 @@ use Symfony\Component\HttpKernel\Profiler\Profiler;
 
 class ProfilerTest extends TestCase
 {
-    private $tmp;
-    private $storage;
+    private string $tmp;
+    private ?FileProfilerStorage $storage = null;
 
     public function testCollect()
     {
         $request = new Request();
         $request->query->set('foo', 'bar');
+        $request->server->set('REMOTE_ADDR', '127.0.0.1');
         $response = new Response('', 204);
         $collector = new RequestDataCollector();
 
@@ -44,9 +45,9 @@ class ProfilerTest extends TestCase
     public function testReset()
     {
         $collector = $this->getMockBuilder(DataCollectorInterface::class)
-            ->setMethods(['collect', 'getName', 'reset'])
+            ->onlyMethods(['collect', 'getName', 'reset'])
             ->getMock();
-        $collector->expects($this->any())->method('getName')->willReturn('mock');
+        $collector->method('getName')->willReturn('mock');
         $collector->expects($this->once())->method('reset');
 
         $profiler = new Profiler($this->storage);
@@ -82,7 +83,29 @@ class ProfilerTest extends TestCase
         $this->assertCount(0, $profiler->find(null, null, null, null, null, null, '204'));
     }
 
-    protected function setUp()
+    public function testIsInitiallyEnabled()
+    {
+        self::assertTrue((new Profiler($this->storage))->isEnabled());
+    }
+
+    public function testDisable()
+    {
+        $profiler = new Profiler($this->storage);
+        $profiler->disable();
+
+        self::assertFalse($profiler->isEnabled());
+    }
+
+    public function testEnable()
+    {
+        $profiler = new Profiler($this->storage);
+        $profiler->disable();
+        $profiler->enable();
+
+        self::assertTrue($profiler->isEnabled());
+    }
+
+    protected function setUp(): void
     {
         $this->tmp = tempnam(sys_get_temp_dir(), 'sf_profiler');
         if (file_exists($this->tmp)) {
@@ -93,7 +116,7 @@ class ProfilerTest extends TestCase
         $this->storage->purge();
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         if (null !== $this->storage) {
             $this->storage->purge();

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,18 +11,19 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\LogRecord;
+use Monolog\Level;
 
-class GroupHandlerTest extends TestCase
+class GroupHandlerTest extends \Monolog\Test\MonologTestCase
 {
     /**
      * @covers Monolog\Handler\GroupHandler::__construct
-     * @expectedException InvalidArgumentException
      */
     public function testConstructorOnlyTakesHandler()
     {
-        new GroupHandler(array(new TestHandler(), "foo"));
+        $this->expectException(\InvalidArgumentException::class);
+
+        new GroupHandler([new TestHandler(), "foo"]);
     }
 
     /**
@@ -31,14 +32,14 @@ class GroupHandlerTest extends TestCase
      */
     public function testHandle()
     {
-        $testHandlers = array(new TestHandler(), new TestHandler());
+        $testHandlers = [new TestHandler(), new TestHandler()];
         $handler = new GroupHandler($testHandlers);
-        $handler->handle($this->getRecord(Logger::DEBUG));
-        $handler->handle($this->getRecord(Logger::INFO));
+        $handler->handle($this->getRecord(Level::Debug));
+        $handler->handle($this->getRecord(Level::Info));
         foreach ($testHandlers as $test) {
             $this->assertTrue($test->hasDebugRecords());
             $this->assertTrue($test->hasInfoRecords());
-            $this->assertTrue(count($test->getRecords()) === 2);
+            $this->assertCount(2, $test->getRecords());
         }
     }
 
@@ -47,13 +48,13 @@ class GroupHandlerTest extends TestCase
      */
     public function testHandleBatch()
     {
-        $testHandlers = array(new TestHandler(), new TestHandler());
+        $testHandlers = [new TestHandler(), new TestHandler()];
         $handler = new GroupHandler($testHandlers);
-        $handler->handleBatch(array($this->getRecord(Logger::DEBUG), $this->getRecord(Logger::INFO)));
+        $handler->handleBatch([$this->getRecord(Level::Debug), $this->getRecord(Level::Info)]);
         foreach ($testHandlers as $test) {
             $this->assertTrue($test->hasDebugRecords());
             $this->assertTrue($test->hasInfoRecords());
-            $this->assertTrue(count($test->getRecords()) === 2);
+            $this->assertCount(2, $test->getRecords());
         }
     }
 
@@ -62,11 +63,11 @@ class GroupHandlerTest extends TestCase
      */
     public function testIsHandling()
     {
-        $testHandlers = array(new TestHandler(Logger::ERROR), new TestHandler(Logger::WARNING));
+        $testHandlers = [new TestHandler(Level::Error), new TestHandler(Level::Warning)];
         $handler = new GroupHandler($testHandlers);
-        $this->assertTrue($handler->isHandling($this->getRecord(Logger::ERROR)));
-        $this->assertTrue($handler->isHandling($this->getRecord(Logger::WARNING)));
-        $this->assertFalse($handler->isHandling($this->getRecord(Logger::DEBUG)));
+        $this->assertTrue($handler->isHandling($this->getRecord(Level::Error)));
+        $this->assertTrue($handler->isHandling($this->getRecord(Level::Warning)));
+        $this->assertFalse($handler->isHandling($this->getRecord(Level::Debug)));
     }
 
     /**
@@ -75,13 +76,13 @@ class GroupHandlerTest extends TestCase
     public function testHandleUsesProcessors()
     {
         $test = new TestHandler();
-        $handler = new GroupHandler(array($test));
+        $handler = new GroupHandler([$test]);
         $handler->pushProcessor(function ($record) {
-            $record['extra']['foo'] = true;
+            $record->extra['foo'] = true;
 
             return $record;
         });
-        $handler->handle($this->getRecord(Logger::WARNING));
+        $handler->handle($this->getRecord(Level::Warning));
         $this->assertTrue($test->hasWarningRecords());
         $records = $test->getRecords();
         $this->assertTrue($records[0]['extra']['foo']);
@@ -92,21 +93,61 @@ class GroupHandlerTest extends TestCase
      */
     public function testHandleBatchUsesProcessors()
     {
-        $testHandlers = array(new TestHandler(), new TestHandler());
+        $testHandlers = [new TestHandler(), new TestHandler()];
         $handler = new GroupHandler($testHandlers);
         $handler->pushProcessor(function ($record) {
-            $record['extra']['foo'] = true;
+            $record->extra['foo'] = true;
 
             return $record;
         });
-        $handler->handleBatch(array($this->getRecord(Logger::DEBUG), $this->getRecord(Logger::INFO)));
+        $handler->pushProcessor(function ($record) {
+            $record->extra['foo2'] = true;
+
+            return $record;
+        });
+        $handler->handleBatch([$this->getRecord(Level::Debug), $this->getRecord(Level::Info)]);
         foreach ($testHandlers as $test) {
             $this->assertTrue($test->hasDebugRecords());
             $this->assertTrue($test->hasInfoRecords());
-            $this->assertTrue(count($test->getRecords()) === 2);
+            $this->assertCount(2, $test->getRecords());
             $records = $test->getRecords();
             $this->assertTrue($records[0]['extra']['foo']);
             $this->assertTrue($records[1]['extra']['foo']);
+            $this->assertTrue($records[0]['extra']['foo2']);
+            $this->assertTrue($records[1]['extra']['foo2']);
         }
+    }
+
+    public function testProcessorsDoNotInterfereBetweenHandlers()
+    {
+        $t1 = new TestHandler();
+        $t2 = new TestHandler();
+        $handler = new GroupHandler([$t1, $t2]);
+
+        $t1->pushProcessor(function (LogRecord $record) {
+            $record->extra['foo'] = 'bar';
+
+            return $record;
+        });
+        $handler->handle($this->getRecord());
+
+        self::assertSame([], $t2->getRecords()[0]->extra);
+    }
+
+    public function testProcessorsDoNotInterfereBetweenHandlersWithBatch()
+    {
+        $t1 = new TestHandler();
+        $t2 = new TestHandler();
+        $handler = new GroupHandler([$t1, $t2]);
+
+        $t1->pushProcessor(function (LogRecord $record) {
+            $record->extra['foo'] = 'bar';
+
+            return $record;
+        });
+
+        $handler->handleBatch([$this->getRecord()]);
+
+        self::assertSame([], $t2->getRecords()[0]->extra);
     }
 }

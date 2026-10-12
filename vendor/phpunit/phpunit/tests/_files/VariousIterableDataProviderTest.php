@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /*
  * This file is part of PHPUnit.
  *
@@ -7,9 +7,14 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-class VariousIterableDataProviderTest
+namespace PHPUnit\TestFixture;
+
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+final class VariousIterableDataProviderTest extends AbstractVariousIterableDataProviderTest
 {
-    public static function asArrayProvider()
+    public static function asArrayStaticProvider(): array
     {
         return [
             ['A'],
@@ -18,7 +23,7 @@ class VariousIterableDataProviderTest
         ];
     }
 
-    public static function asIteratorProvider()
+    public static function asIteratorStaticProvider(): Generator
     {
         yield ['D'];
 
@@ -27,7 +32,7 @@ class VariousIterableDataProviderTest
         yield ['F'];
     }
 
-    public static function asTraversableProvider()
+    public static function asTraversableStaticProvider(): WrapperIteratorAggregate
     {
         return new WrapperIteratorAggregate([
             ['G'],
@@ -36,12 +41,51 @@ class VariousIterableDataProviderTest
         ]);
     }
 
-    /**
-     * @dataProvider asArrayProvider
-     * @dataProvider asIteratorProvider
-     * @dataProvider asTraversableProvider
-     */
-    public function test(): void
+    public static function asArrayProvider(): array
+    {
+        return [
+            ['S'],
+            ['T'],
+            ['U'],
+        ];
+    }
+
+    public static function asIteratorProvider(): Generator
+    {
+        yield ['V'];
+
+        yield ['W'];
+
+        yield ['X'];
+    }
+
+    public static function asTraversableProvider(): WrapperIteratorAggregate
+    {
+        return new WrapperIteratorAggregate([
+            ['Y'],
+            ['Z'],
+            ['P'],
+        ]);
+    }
+
+    #[DataProvider('asArrayStaticProvider')]
+    #[DataProvider('asIteratorStaticProvider')]
+    #[DataProvider('asTraversableStaticProvider')]
+    public function testStatic(): void
+    {
+    }
+
+    #[DataProvider('asArrayProvider')]
+    #[DataProvider('asIteratorProvider')]
+    #[DataProvider('asTraversableProvider')]
+    public function testNonStatic(): void
+    {
+    }
+
+    #[DataProvider('asArrayProviderInParent')]
+    #[DataProvider('asIteratorProviderInParent')]
+    #[DataProvider('asTraversableProviderInParent')]
+    public function testFromParent(): void
     {
     }
 }

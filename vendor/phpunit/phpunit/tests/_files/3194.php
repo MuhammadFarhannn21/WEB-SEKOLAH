@@ -7,7 +7,9 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+namespace PHPUnit\TestFixture;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 trait T3194
@@ -28,9 +30,7 @@ final class C3194
     }
 }
 
-/**
- * @covers C3194
- */
+#[CoversClass(C3194::class)]
 final class Test3194 extends TestCase
 {
     public function testOne(): void

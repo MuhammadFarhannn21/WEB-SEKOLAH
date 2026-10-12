@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2018 Justin Hileman
+ * (c) 2012-2026 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -11,32 +11,35 @@
 
 namespace Psy\Test\Exception;
 
+use PhpParser\Error as PhpParserError;
+use Psy\Exception\Exception;
 use Psy\Exception\ParseErrorException;
+use Psy\Test\TestCase;
 
-class ParseErrorExceptionTest extends \PHPUnit\Framework\TestCase
+class ParseErrorExceptionTest extends TestCase
 {
     public function testInstance()
     {
         $e = new ParseErrorException();
 
-        $this->assertInstanceOf('Psy\Exception\Exception', $e);
-        $this->assertInstanceOf('PhpParser\Error', $e);
-        $this->assertInstanceOf('Psy\Exception\ParseErrorException', $e);
+        $this->assertInstanceOf(Exception::class, $e);
+        $this->assertInstanceOf(PhpParserError::class, $e);
+        $this->assertInstanceOf(ParseErrorException::class, $e);
     }
 
     public function testMessage()
     {
         $e = new ParseErrorException('{msg}', 1);
 
-        $this->assertContains('{msg}', $e->getMessage());
-        $this->assertContains('PHP Parse error:', $e->getMessage());
+        $this->assertStringContainsString('{msg}', $e->getMessage());
+        $this->assertStringContainsString('PHP Parse error:', $e->getMessage());
     }
 
     public function testConstructFromParseError()
     {
-        $e = ParseErrorException::fromParseError(new \PhpParser\Error('{msg}'));
+        $e = ParseErrorException::fromParseError(new PhpParserError('{msg}'));
 
-        $this->assertContains('{msg}', $e->getRawMessage());
-        $this->assertContains('PHP Parse error:', $e->getMessage());
+        $this->assertStringContainsString('{msg}', $e->getRawMessage());
+        $this->assertStringContainsString('PHP Parse error:', $e->getMessage());
     }
 }

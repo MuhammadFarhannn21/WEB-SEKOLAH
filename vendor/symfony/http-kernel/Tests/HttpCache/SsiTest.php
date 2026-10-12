@@ -14,6 +14,7 @@ namespace Symfony\Component\HttpKernel\Tests\HttpCache;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\HttpCache\HttpCache;
 use Symfony\Component\HttpKernel\HttpCache\Ssi;
 
 class SsiTest extends TestCase
@@ -100,13 +101,15 @@ class SsiTest extends TestCase
         $response = new Response('foo <!--#include virtual="..." -->');
         $ssi->process($request, $response);
 
-        $this->assertEquals('foo <?php echo $this->surrogate->handle($this, \'...\', \'\', false) ?>'."\n", $response->getContent());
+        $content = explode(substr($response->getContent(), 0, 24), $response->getContent());
+        $this->assertSame(['', 'foo ', "...\n\n\n", ''], $content);
         $this->assertEquals('SSI', $response->headers->get('x-body-eval'));
 
         $response = new Response('foo <!--#include virtual="foo\'" -->');
         $ssi->process($request, $response);
 
-        $this->assertEquals("foo <?php echo \$this->surrogate->handle(\$this, 'foo\\'', '', false) ?>"."\n", $response->getContent());
+        $content = explode(substr($response->getContent(), 0, 24), $response->getContent());
+        $this->assertSame(['', 'foo ', "foo'\n\n\n", ''], $content);
     }
 
     public function testProcessEscapesPhpTags()
@@ -117,14 +120,13 @@ class SsiTest extends TestCase
         $response = new Response('<?php <? <% <script language=php>');
         $ssi->process($request, $response);
 
-        $this->assertEquals('<?php echo "<?"; ?>php <?php echo "<?"; ?> <?php echo "<%"; ?> <?php echo "<s"; ?>cript language=php>', $response->getContent());
+        $content = explode(substr($response->getContent(), 0, 24), $response->getContent());
+        $this->assertSame(['', '<?php <? <% <script language=php>', ''], $content);
     }
 
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testProcessWhenNoSrcInAnSsi()
     {
+        $this->expectException(\RuntimeException::class);
         $ssi = new Ssi();
 
         $request = Request::create('/');
@@ -160,11 +162,9 @@ class SsiTest extends TestCase
         $this->assertEquals('foo', $ssi->handle($cache, '/', '/alt', true));
     }
 
-    /**
-     * @expectedException \RuntimeException
-     */
     public function testHandleWhenResponseIsNot200()
     {
+        $this->expectException(\RuntimeException::class);
         $ssi = new Ssi();
         $response = new Response('foo');
         $response->setStatusCode(404);
@@ -193,20 +193,20 @@ class SsiTest extends TestCase
 
     protected function getCache($request, $response)
     {
-        $cache = $this->getMockBuilder('Symfony\Component\HttpKernel\HttpCache\HttpCache')->setMethods(['getRequest', 'handle'])->disableOriginalConstructor()->getMock();
-        $cache->expects($this->any())
+        $cache = $this->getMockBuilder(HttpCache::class)->onlyMethods(['getRequest', 'handle'])->disableOriginalConstructor()->getMock();
+        $cache->expects($this->atLeastOnce())
               ->method('getRequest')
-              ->will($this->returnValue($request))
+              ->willReturn($request)
         ;
         if (\is_array($response)) {
-            $cache->expects($this->any())
+            $cache
                   ->method('handle')
-                  ->will($this->onConsecutiveCalls(...$response))
+                  ->willReturn(...$response)
             ;
         } else {
-            $cache->expects($this->any())
+            $cache
                   ->method('handle')
-                  ->will($this->returnValue($response))
+                  ->willReturn($response)
             ;
         }
 

@@ -7,36 +7,21 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-
 namespace SebastianBergmann\Diff\Output;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\Diff\Differ;
+use SebastianBergmann\Diff\TimeEfficientLongestCommonSubsequenceCalculator;
 
-/**
- * @covers SebastianBergmann\Diff\Output\DiffOnlyOutputBuilder
- *
- * @uses SebastianBergmann\Diff\Differ
- * @uses SebastianBergmann\Diff\TimeEfficientLongestCommonSubsequenceCalculator
- */
+#[CoversClass(DiffOnlyOutputBuilder::class)]
+#[UsesClass(Differ::class)]
+#[UsesClass(TimeEfficientLongestCommonSubsequenceCalculator::class)]
 final class DiffOnlyOutputBuilderTest extends TestCase
 {
-    /**
-     * @param string $expected
-     * @param string $from
-     * @param string $to
-     * @param string $header
-     *
-     * @dataProvider textForNoNonDiffLinesProvider
-     */
-    public function testDiffDoNotShowNonDiffLines(string $expected, string $from, string $to, string $header = ''): void
-    {
-        $differ = new Differ(new DiffOnlyOutputBuilder($header));
-
-        $this->assertSame($expected, $differ->diff($from, $to));
-    }
-
-    public function textForNoNonDiffLinesProvider(): array
+    public static function textForNoNonDiffLinesProvider(): array
     {
         return [
             [
@@ -72,5 +57,13 @@ final class DiffOnlyOutputBuilderTest extends TestCase
                 "header\n",
             ],
         ];
+    }
+
+    #[DataProvider('textForNoNonDiffLinesProvider')]
+    public function testDiffDoNotShowNonDiffLines(string $expected, string $from, string $to, string $header = ''): void
+    {
+        $differ = new Differ(new DiffOnlyOutputBuilder($header));
+
+        $this->assertSame($expected, $differ->diff($from, $to));
     }
 }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,12 +11,10 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-
 /**
  * @covers Monolog\Handler\SamplingHandler::handle
  */
-class SamplingHandlerTest extends TestCase
+class SamplingHandlerTest extends \Monolog\Test\MonologTestCase
 {
     public function testHandle()
     {
@@ -25,7 +23,7 @@ class SamplingHandlerTest extends TestCase
         for ($i = 0; $i < 10000; $i++) {
             $handler->handle($this->getRecord());
         }
-        $count = count($testHandler->getRecords());
+        $count = \count($testHandler->getRecords());
         // $count should be half of 10k, so between 4k and 6k
         $this->assertLessThan(6000, $count);
         $this->assertGreaterThan(4000, $count);

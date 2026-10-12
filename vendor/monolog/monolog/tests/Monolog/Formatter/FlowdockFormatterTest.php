@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,10 +11,10 @@
 
 namespace Monolog\Formatter;
 
-use Monolog\Logger;
-use Monolog\TestCase;
+use Monolog\Level;
+use Monolog\Test\MonologTestCase;
 
-class FlowdockFormatterTest extends TestCase
+class FlowdockFormatterTest extends MonologTestCase
 {
     /**
      * @covers Monolog\Formatter\FlowdockFormatter::format
@@ -24,17 +24,17 @@ class FlowdockFormatterTest extends TestCase
         $formatter = new FlowdockFormatter('test_source', 'source@test.com');
         $record = $this->getRecord();
 
-        $expected = array(
+        $expected = [
             'source' => 'test_source',
             'from_address' => 'source@test.com',
             'subject' => 'in test_source: WARNING - test',
             'content' => 'test',
-            'tags' => array('#logs', '#warning', '#test'),
+            'tags' => ['#logs', '#warning', '#test'],
             'project' => 'test_source',
-        );
+        ];
         $formatted = $formatter->format($record);
 
-        $this->assertEquals($expected, $formatted['flowdock']);
+        $this->assertEquals($expected, $formatted);
     }
 
     /**
@@ -43,13 +43,13 @@ class FlowdockFormatterTest extends TestCase
     public function testFormatBatch()
     {
         $formatter = new FlowdockFormatter('test_source', 'source@test.com');
-        $records = array(
-            $this->getRecord(Logger::WARNING),
-            $this->getRecord(Logger::DEBUG),
-        );
+        $records = [
+            $this->getRecord(Level::Warning),
+            $this->getRecord(Level::Debug),
+        ];
         $formatted = $formatter->formatBatch($records);
 
-        $this->assertArrayHasKey('flowdock', $formatted[0]);
-        $this->assertArrayHasKey('flowdock', $formatted[1]);
+        $this->assertArrayHasKey('from_address', $formatted[0]);
+        $this->assertArrayHasKey('from_address', $formatted[1]);
     }
 }

@@ -11,11 +11,13 @@
 
 namespace Symfony\Component\VarDumper\Tests\Caster;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\VarDumper\Caster\Caster;
 use Symfony\Component\VarDumper\Caster\DateCaster;
 use Symfony\Component\VarDumper\Cloner\Stub;
 use Symfony\Component\VarDumper\Test\VarDumperTestTrait;
+use Symfony\Component\VarDumper\Tests\Fixtures\DateTimeChild;
 
 /**
  * @author Dany Maillard <danymaillard93b@gmail.com>
@@ -24,56 +26,78 @@ class DateCasterTest extends TestCase
 {
     use VarDumperTestTrait;
 
-    /**
-     * @dataProvider provideDateTimes
-     */
-    public function testDumpDateTime($time, $timezone, $xDate, $xTimestamp)
+    private string $previousTimezone;
+
+    protected function setUp(): void
+    {
+        $this->previousTimezone = date_default_timezone_get();
+    }
+
+    protected function tearDown(): void
+    {
+        date_default_timezone_set($this->previousTimezone);
+    }
+
+    #[DataProvider('provideDateTimes')]
+    public function testDumpDateTime($time, $timezone, $xDate, $xTimestamp, $xInfos)
     {
         $date = new \DateTime($time, new \DateTimeZone($timezone));
 
         $xDump = <<<EODUMP
-DateTime @$xTimestamp {
-  date: $xDate
-}
-EODUMP;
+            DateTime @$xTimestamp {
+              date: $xDate
+            }
+            EODUMP;
 
         $this->assertDumpEquals($xDump, $date);
     }
 
-    /**
-     * @dataProvider provideDateTimes
-     */
+    #[DataProvider('provideDateTimes')]
+    public function testDumpDateTimeImmutable($time, $timezone, $xDate, $xTimestamp, $xInfos)
+    {
+        $date = new \DateTimeImmutable($time, new \DateTimeZone($timezone));
+
+        $xDump = <<<EODUMP
+            DateTimeImmutable @$xTimestamp {
+              date: $xDate
+            }
+            EODUMP;
+
+        $this->assertDumpEquals($xDump, $date);
+    }
+
+    #[DataProvider('provideDateTimes')]
     public function testCastDateTime($time, $timezone, $xDate, $xTimestamp, $xInfos)
     {
         $stub = new Stub();
-        $date = new \DateTime($time, new \DateTimeZone($timezone));
-        $cast = DateCaster::castDateTime($date, ['foo' => 'bar'], $stub, false, 0);
+        $date = new \DateTimeImmutable($time, new \DateTimeZone($timezone));
+        $cast = DateCaster::castDateTime($date, Caster::castObject($date, \DateTimeImmutable::class), $stub, false, 0);
 
         $xDump = <<<EODUMP
-array:1 [
-  "\\x00~\\x00date" => $xDate
-]
-EODUMP;
+            array:1 [
+              "\\x00~\\x00date" => $xDate
+            ]
+            EODUMP;
 
         $this->assertDumpEquals($xDump, $cast);
 
         $xDump = <<<EODUMP
-Symfony\Component\VarDumper\Caster\ConstStub {
-  +type: 1
-  +class: "$xDate"
-  +value: "%A$xInfos%A"
-  +cut: 0
-  +handle: 0
-  +refCount: 0
-  +position: 0
-  +attr: []
-}
-EODUMP;
+            Symfony\Component\VarDumper\Caster\ConstStub {
+              +type: 1
+              +class: "$xDate"
+              +value: "%A$xInfos%A"
+              +cut: 0
+              +handle: 0
+              +refCount: 0
+              +position: 0
+              +attr: []
+            }
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $cast["\0~\0date"]);
     }
 
-    public function provideDateTimes()
+    public static function provideDateTimes()
     {
         return [
             ['2017-04-30 00:00:00.000000', 'Europe/Zurich', '2017-04-30 00:00:00.0 Europe/Zurich (+02:00)', 1493503200, 'Sunday, April 30, 2017%Afrom now%ADST On'],
@@ -89,65 +113,127 @@ EODUMP;
         ];
     }
 
-    /**
-     * @dataProvider provideIntervals
-     */
-    public function testDumpInterval($intervalSpec, $ms, $invert, $expected)
+    #[DataProvider('provideNoTimezoneDateTimes')]
+    public function testCastDateTimeNoTimezone($time, $xDate, $xInfos)
     {
-        if ($ms && \PHP_VERSION_ID >= 70200 && version_compare(PHP_VERSION, '7.2.0rc3', '<=')) {
-            $this->markTestSkipped('Skipped on 7.2 before rc4 because of php bug #75354.');
-        }
+        date_default_timezone_set('UTC');
 
+        $stub = new Stub();
+        $date = new NoTimezoneDate($time);
+        $cast = DateCaster::castDateTime($date, Caster::castObject($date, \DateTime::class), $stub, false, 0);
+
+        $xDump = <<<EODUMP
+            array:1 [
+              "\\x00~\\x00date" => $xDate
+            ]
+            EODUMP;
+
+        $this->assertDumpEquals($xDump, $cast);
+
+        $xDump = <<<EODUMP
+            Symfony\Component\VarDumper\Caster\ConstStub {
+              +type: 1
+              +class: "$xDate"
+              +value: "%A$xInfos%A"
+              +cut: 0
+              +handle: 0
+              +refCount: 0
+              +position: 0
+              +attr: []
+            }
+            EODUMP;
+
+        $this->assertDumpMatchesFormat($xDump, $cast["\0~\0date"]);
+    }
+
+    public static function provideNoTimezoneDateTimes()
+    {
+        return [
+            ['2017-04-30 00:00:00.000000', '2017-04-30 00:00:00.0 +00:00', 'Sunday, April 30, 2017'],
+            ['2017-04-30 00:00:00.100000', '2017-04-30 00:00:00.100 +00:00', 'Sunday, April 30, 2017'],
+            ['2017-04-30 00:00:00.120000', '2017-04-30 00:00:00.120 +00:00', 'Sunday, April 30, 2017'],
+            ['2017-04-30 00:00:00.123000', '2017-04-30 00:00:00.123 +00:00', 'Sunday, April 30, 2017'],
+            ['2017-04-30 00:00:00.123400', '2017-04-30 00:00:00.123400 +00:00', 'Sunday, April 30, 2017'],
+            ['2017-04-30 00:00:00.123450', '2017-04-30 00:00:00.123450 +00:00', 'Sunday, April 30, 2017'],
+            ['2017-04-30 00:00:00.123456', '2017-04-30 00:00:00.123456 +00:00', 'Sunday, April 30, 2017'],
+        ];
+    }
+
+    public function testCastDateTimeWithAdditionalChildProperty()
+    {
+        $stub = new Stub();
+        $date = new DateTimeChild('2020-02-13 00:00:00.123456', new \DateTimeZone('Europe/Paris'));
+        $objectCast = Caster::castObject($date, DateTimeChild::class);
+        $dateCast = DateCaster::castDateTime($date, $objectCast, $stub, false, 0);
+
+        $xDate = '2020-02-13 00:00:00.123456 Europe/Paris (+01:00)';
+        $xInfo = 'Thursday, February 13, 2020%Afrom now';
+        $xDump = <<<EODUMP
+            array:2 [
+              "\\x00Symfony\Component\VarDumper\Tests\Fixtures\DateTimeChild\\x00addedProperty" => "foo"
+              "\\x00~\\x00date" => $xDate
+            ]
+            EODUMP;
+
+        $this->assertDumpEquals($xDump, $dateCast);
+
+        $xDump = <<<EODUMP
+            Symfony\Component\VarDumper\Caster\ConstStub {
+              +type: 1
+              +class: "$xDate"
+              +value: "%A$xInfo%A"
+              +cut: 0
+              +handle: 0
+              +refCount: 0
+              +position: 0
+              +attr: []
+            }
+            EODUMP;
+
+        $this->assertDumpMatchesFormat($xDump, $dateCast["\0~\0date"]);
+    }
+
+    #[DataProvider('provideIntervals')]
+    public function testDumpInterval($intervalSpec, $ms, $invert, $expected, $xSeconds)
+    {
         $interval = $this->createInterval($intervalSpec, $ms, $invert);
 
         $xDump = <<<EODUMP
-DateInterval {
-  interval: $expected
-%A}
-EODUMP;
+            DateInterval {
+              interval: $expected
+            %A}
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $interval);
     }
 
-    /**
-     * @dataProvider provideIntervals
-     */
-    public function testDumpIntervalExcludingVerbosity($intervalSpec, $ms, $invert, $expected)
+    #[DataProvider('provideIntervals')]
+    public function testDumpIntervalExcludingVerbosity($intervalSpec, $ms, $invert, $expected, $xSeconds)
     {
-        if ($ms && \PHP_VERSION_ID >= 70200 && version_compare(PHP_VERSION, '7.2.0rc3', '<=')) {
-            $this->markTestSkipped('Skipped on 7.2 before rc4 because of php bug #75354.');
-        }
-
         $interval = $this->createInterval($intervalSpec, $ms, $invert);
 
         $xDump = <<<EODUMP
-DateInterval {
-  interval: $expected
-}
-EODUMP;
+            DateInterval {
+              interval: $expected
+            }
+            EODUMP;
 
         $this->assertDumpEquals($xDump, $interval, Caster::EXCLUDE_VERBOSE);
     }
 
-    /**
-     * @dataProvider provideIntervals
-     */
+    #[DataProvider('provideIntervals')]
     public function testCastInterval($intervalSpec, $ms, $invert, $xInterval, $xSeconds)
     {
-        if ($ms && \PHP_VERSION_ID >= 70200 && version_compare(PHP_VERSION, '7.2.0rc3', '<=')) {
-            $this->markTestSkipped('Skipped on 7.2 before rc4 because of php bug #75354.');
-        }
-
         $interval = $this->createInterval($intervalSpec, $ms, $invert);
         $stub = new Stub();
 
         $cast = DateCaster::castInterval($interval, ['foo' => 'bar'], $stub, false, Caster::EXCLUDE_VERBOSE);
 
         $xDump = <<<EODUMP
-array:1 [
-  "\\x00~\\x00interval" => $xInterval
-]
-EODUMP;
+            array:1 [
+              "\\x00~\\x00interval" => $xInterval
+            ]
+            EODUMP;
 
         $this->assertDumpEquals($xDump, $cast);
 
@@ -156,22 +242,22 @@ EODUMP;
         }
 
         $xDump = <<<EODUMP
-Symfony\Component\VarDumper\Caster\ConstStub {
-  +type: 1
-  +class: "$xInterval"
-  +value: "$xSeconds"
-  +cut: 0
-  +handle: 0
-  +refCount: 0
-  +position: 0
-  +attr: []
-}
-EODUMP;
+            Symfony\Component\VarDumper\Caster\ConstStub {
+              +type: 1
+              +class: "$xInterval"
+              +value: "$xSeconds"
+              +cut: 0
+              +handle: 0
+              +refCount: 0
+              +position: 0
+              +attr: []
+            }
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $cast["\0~\0interval"]);
     }
 
-    public function provideIntervals()
+    public static function provideIntervals()
     {
         return [
             ['PT0S', 0, 0, '0s', '0s'],
@@ -204,41 +290,35 @@ EODUMP;
         ];
     }
 
-    /**
-     * @dataProvider provideTimeZones
-     */
-    public function testDumpTimeZone($timezone, $expected)
+    #[DataProvider('provideTimeZones')]
+    public function testDumpTimeZone($timezone, $expected, $xRegion)
     {
         $timezone = new \DateTimeZone($timezone);
 
         $xDump = <<<EODUMP
-DateTimeZone {
-  timezone: $expected
-%A}
-EODUMP;
+            DateTimeZone {
+              timezone: $expected
+            %A}
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $timezone);
     }
 
-    /**
-     * @dataProvider provideTimeZones
-     */
-    public function testDumpTimeZoneExcludingVerbosity($timezone, $expected)
+    #[DataProvider('provideTimeZones')]
+    public function testDumpTimeZoneExcludingVerbosity($timezone, $expected, $xRegion)
     {
         $timezone = new \DateTimeZone($timezone);
 
         $xDump = <<<EODUMP
-DateTimeZone {
-  timezone: $expected
-}
-EODUMP;
+            DateTimeZone {
+              timezone: $expected
+            }
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $timezone, Caster::EXCLUDE_VERBOSE);
     }
 
-    /**
-     * @dataProvider provideTimeZones
-     */
+    #[DataProvider('provideTimeZones')]
     public function testCastTimeZone($timezone, $xTimezone, $xRegion)
     {
         $timezone = new \DateTimeZone($timezone);
@@ -247,30 +327,30 @@ EODUMP;
         $cast = DateCaster::castTimeZone($timezone, ['foo' => 'bar'], $stub, false, Caster::EXCLUDE_VERBOSE);
 
         $xDump = <<<EODUMP
-array:1 [
-  "\\x00~\\x00timezone" => $xTimezone
-]
-EODUMP;
+            array:1 [
+              "\\x00~\\x00timezone" => $xTimezone
+            ]
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $cast);
 
         $xDump = <<<EODUMP
-Symfony\Component\VarDumper\Caster\ConstStub {
-  +type: 1
-  +class: "$xTimezone"
-  +value: "$xRegion"
-  +cut: 0
-  +handle: 0
-  +refCount: 0
-  +position: 0
-  +attr: []
-}
-EODUMP;
+            Symfony\Component\VarDumper\Caster\ConstStub {
+              +type: 1
+              +class: "$xTimezone"
+              +value: "$xRegion"
+              +cut: 0
+              +handle: 0
+              +refCount: 0
+              +position: 0
+              +attr: []
+            }
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $cast["\0~\0timezone"]);
     }
 
-    public function provideTimeZones()
+    public static function provideTimeZones()
     {
         $xRegion = \extension_loaded('intl') ? '%s' : '';
 
@@ -297,84 +377,76 @@ EODUMP;
         ];
     }
 
-    /**
-     * @dataProvider providePeriods
-     */
-    public function testDumpPeriod($start, $interval, $end, $options, $expected)
+    #[DataProvider('providePeriods')]
+    public function testDumpPeriod($start, $interval, $end, $options, $expected, $xDates)
     {
-        $p = new \DatePeriod(new \DateTime($start), new \DateInterval($interval), \is_int($end) ? $end : new \DateTime($end), $options);
+        $p = new \DatePeriod(new \DateTimeImmutable($start), new \DateInterval($interval), \is_int($end) ? $end : new \DateTime($end), $options);
 
         $xDump = <<<EODUMP
-DatePeriod {
-  period: $expected
-%A}
-EODUMP;
+            DatePeriod {
+              period: $expected
+            %A}
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $p);
     }
 
-    /**
-     * @dataProvider providePeriods
-     */
+    #[DataProvider('providePeriods')]
     public function testCastPeriod($start, $interval, $end, $options, $xPeriod, $xDates)
     {
-        $p = new \DatePeriod(new \DateTime($start), new \DateInterval($interval), \is_int($end) ? $end : new \DateTime($end), $options);
+        $p = new \DatePeriod(new \DateTimeImmutable($start, new \DateTimeZone('UTC')), new \DateInterval($interval), \is_int($end) ? $end : new \DateTimeImmutable($end, new \DateTimeZone('UTC')), $options);
         $stub = new Stub();
 
         $cast = DateCaster::castPeriod($p, [], $stub, false, 0);
 
         $xDump = <<<EODUMP
-array:1 [
-  "\\x00~\\x00period" => $xPeriod
-]
-EODUMP;
+            array:1 [
+              "\\x00~\\x00period" => $xPeriod
+            ]
+            EODUMP;
 
         $this->assertDumpEquals($xDump, $cast);
 
         $xDump = <<<EODUMP
-Symfony\Component\VarDumper\Caster\ConstStub {
-  +type: 1
-  +class: "$xPeriod"
-  +value: "%A$xDates%A"
-  +cut: 0
-  +handle: 0
-  +refCount: 0
-  +position: 0
-  +attr: []
-}
-EODUMP;
+            Symfony\Component\VarDumper\Caster\ConstStub {
+              +type: 1
+              +class: "$xPeriod"
+              +value: "%A$xDates%A"
+              +cut: 0
+              +handle: 0
+              +refCount: 0
+              +position: 0
+              +attr: []
+            }
+            EODUMP;
 
         $this->assertDumpMatchesFormat($xDump, $cast["\0~\0period"]);
     }
 
-    public function providePeriods()
+    public static function providePeriods()
     {
         $periods = [
-            ['2017-01-01', 'P1D', '2017-01-03', 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) to 2017-01-03 00:00:00.0', '1) 2017-01-01%a2) 2017-01-02'],
-            ['2017-01-01', 'P1D', 1, 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) recurring 2 time/s', '1) 2017-01-01%a2) 2017-01-02'],
+            ['2017-01-01', 'P1D', '2017-01-03', 0, 'every + 1d, from [2017-01-01 00:00:00.0 to 2017-01-03 00:00:00.0[', '1) 2017-01-01%a2) 2017-01-02'],
+            ['2017-01-01', 'P1D', 1, 0, 'every + 1d, from [2017-01-01 00:00:00.0 recurring 2 time/s', '1) 2017-01-01%a2) 2017-01-02'],
 
-            ['2017-01-01', 'P1D', '2017-01-04', 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) to 2017-01-04 00:00:00.0', '1) 2017-01-01%a2) 2017-01-02%a3) 2017-01-03'],
-            ['2017-01-01', 'P1D', 2, 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) recurring 3 time/s', '1) 2017-01-01%a2) 2017-01-02%a3) 2017-01-03'],
+            ['2017-01-01', 'P1D', '2017-01-04', 0, 'every + 1d, from [2017-01-01 00:00:00.0 to 2017-01-04 00:00:00.0[', '1) 2017-01-01%a2) 2017-01-02%a3) 2017-01-03'],
+            ['2017-01-01', 'P1D', 2, 0, 'every + 1d, from [2017-01-01 00:00:00.0 recurring 3 time/s', '1) 2017-01-01%a2) 2017-01-02%a3) 2017-01-03'],
 
-            ['2017-01-01', 'P1D', '2017-01-05', 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) to 2017-01-05 00:00:00.0', '1) 2017-01-01%a2) 2017-01-02%a1 more'],
-            ['2017-01-01', 'P1D', 3, 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) recurring 4 time/s', '1) 2017-01-01%a2) 2017-01-02%a3) 2017-01-03%a1 more'],
+            ['2017-01-01', 'P1D', '2017-01-05', 0, 'every + 1d, from [2017-01-01 00:00:00.0 to 2017-01-05 00:00:00.0[', '1) 2017-01-01%a2) 2017-01-02%a1 more'],
+            ['2017-01-01', 'P1D', 3, 0, 'every + 1d, from [2017-01-01 00:00:00.0 recurring 4 time/s', '1) 2017-01-01%a2) 2017-01-02%a3) 2017-01-03%a1 more'],
 
-            ['2017-01-01', 'P1D', '2017-01-21', 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) to 2017-01-21 00:00:00.0', '1) 2017-01-01%a17 more'],
-            ['2017-01-01', 'P1D', 19, 0, 'every + 1d, from 2017-01-01 00:00:00.0 (included) recurring 20 time/s', '1) 2017-01-01%a17 more'],
+            ['2017-01-01', 'P1D', '2017-01-21', 0, 'every + 1d, from [2017-01-01 00:00:00.0 to 2017-01-21 00:00:00.0[', '1) 2017-01-01%a17 more'],
+            ['2017-01-01', 'P1D', 19, 0, 'every + 1d, from [2017-01-01 00:00:00.0 recurring 20 time/s', '1) 2017-01-01%a17 more'],
 
-            ['2017-01-01 01:00:00', 'P1D', '2017-01-03 01:00:00', 0, 'every + 1d, from 2017-01-01 01:00:00.0 (included) to 2017-01-03 01:00:00.0', '1) 2017-01-01 01:00:00.0%a2) 2017-01-02 01:00:00.0'],
-            ['2017-01-01 01:00:00', 'P1D', 1, 0, 'every + 1d, from 2017-01-01 01:00:00.0 (included) recurring 2 time/s', '1) 2017-01-01 01:00:00.0%a2) 2017-01-02 01:00:00.0'],
+            ['2017-01-01 01:00:00', 'P1D', '2017-01-03 01:00:00', 0, 'every + 1d, from [2017-01-01 01:00:00.0 to 2017-01-03 01:00:00.0[', '1) 2017-01-01 01:00:00.0%a2) 2017-01-02 01:00:00.0'],
+            ['2017-01-01 01:00:00', 'P1D', 1, 0, 'every + 1d, from [2017-01-01 01:00:00.0 recurring 2 time/s', '1) 2017-01-01 01:00:00.0%a2) 2017-01-02 01:00:00.0'],
 
-            ['2017-01-01', 'P1DT1H', '2017-01-03', 0, 'every + 1d 01:00:00.0, from 2017-01-01 00:00:00.0 (included) to 2017-01-03 00:00:00.0', '1) 2017-01-01 00:00:00.0%a2) 2017-01-02 01:00:00.0'],
-            ['2017-01-01', 'P1DT1H', 1, 0, 'every + 1d 01:00:00.0, from 2017-01-01 00:00:00.0 (included) recurring 2 time/s', '1) 2017-01-01 00:00:00.0%a2) 2017-01-02 01:00:00.0'],
+            ['2017-01-01', 'P1DT1H', '2017-01-03', 0, 'every + 1d 01:00:00.0, from [2017-01-01 00:00:00.0 to 2017-01-03 00:00:00.0[', '1) 2017-01-01 00:00:00.0%a2) 2017-01-02 01:00:00.0'],
+            ['2017-01-01', 'P1DT1H', 1, 0, 'every + 1d 01:00:00.0, from [2017-01-01 00:00:00.0 recurring 2 time/s', '1) 2017-01-01 00:00:00.0%a2) 2017-01-02 01:00:00.0'],
 
-            ['2017-01-01', 'P1D', '2017-01-04', \DatePeriod::EXCLUDE_START_DATE, 'every + 1d, from 2017-01-01 00:00:00.0 (excluded) to 2017-01-04 00:00:00.0', '1) 2017-01-02%a2) 2017-01-03'],
-            ['2017-01-01', 'P1D', 2, \DatePeriod::EXCLUDE_START_DATE, 'every + 1d, from 2017-01-01 00:00:00.0 (excluded) recurring 2 time/s', '1) 2017-01-02%a2) 2017-01-03'],
+            ['2017-01-01', 'P1D', '2017-01-04', \DatePeriod::EXCLUDE_START_DATE, 'every + 1d, from ]2017-01-01 00:00:00.0 to 2017-01-04 00:00:00.0[', '1) 2017-01-02%a2) 2017-01-03'],
+            ['2017-01-01', 'P1D', 2, \DatePeriod::EXCLUDE_START_DATE, 'every + 1d, from ]2017-01-01 00:00:00.0 recurring 2 time/s', '1) 2017-01-02%a2) 2017-01-03'],
         ];
-
-        if (\PHP_VERSION_ID < 70107) {
-            array_walk($periods, function (&$i) { $i[5] = ''; });
-        }
 
         return $periods;
     }
@@ -386,5 +458,13 @@ EODUMP;
         $interval->invert = $invert;
 
         return $interval;
+    }
+}
+
+class NoTimezoneDate extends \DateTime
+{
+    public function getTimezone(): \DateTimeZone|false
+    {
+        return false;
     }
 }

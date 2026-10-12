@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,31 +11,37 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
+use Aws\DynamoDb\DynamoDbClient;
+use PHPUnit\Framework\MockObject\MockObject;
 
-class DynamoDbHandlerTest extends TestCase
+class DynamoDbHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    private $client;
+    private DynamoDbClient&MockObject $client;
 
-    public function setUp()
+    private bool $isV3;
+
+    public function setUp(): void
     {
-        if (!class_exists('Aws\DynamoDb\DynamoDbClient')) {
+        if (!class_exists(DynamoDbClient::class)) {
             $this->markTestSkipped('aws/aws-sdk-php not installed');
         }
 
-        $this->client = $this->getMockBuilder('Aws\DynamoDb\DynamoDbClient')
-            ->setMethods(array('formatAttributes', '__call'))
-            ->disableOriginalConstructor()->getMock();
+        $this->isV3 = \defined('Aws\Sdk::VERSION') && version_compare(\Aws\Sdk::VERSION, '3.0', '>=');
+
+        $implementedMethods = ['__call'];
+
+        $clientMockBuilder = $this->getMockBuilder(DynamoDbClient::class)
+            ->onlyMethods($implementedMethods)
+            ->disableOriginalConstructor();
+
+        $this->client = $clientMockBuilder->getMock();
     }
 
-    public function testConstruct()
+    public function tearDown(): void
     {
-        $this->assertInstanceOf('Monolog\Handler\DynamoDbHandler', new DynamoDbHandler($this->client, 'foo'));
-    }
+        parent::tearDown();
 
-    public function testInterface()
-    {
-        $this->assertInstanceOf('Monolog\Handler\HandlerInterface', new DynamoDbHandler($this->client, 'foo'));
+        unset($this->client);
     }
 
     public function testGetFormatter()
@@ -47,14 +53,13 @@ class DynamoDbHandlerTest extends TestCase
     public function testHandle()
     {
         $record = $this->getRecord();
-        $formatter = $this->getMock('Monolog\Formatter\FormatterInterface');
-        $formatted = array('foo' => 1, 'bar' => 2);
+        $formatter = $this->createMock('Monolog\Formatter\FormatterInterface');
+        $formatted = ['foo' => 1, 'bar' => 2];
         $handler = new DynamoDbHandler($this->client, 'foo');
         $handler->setFormatter($formatter);
 
-        $isV3 = defined('Aws\Sdk::VERSION') && version_compare(\Aws\Sdk::VERSION, '3.0', '>=');
-        if ($isV3) {
-            $expFormatted = array('foo' => array('N' => 1), 'bar' => array('N' => 2));
+        if ($this->isV3) {
+            $expFormatted = ['foo' => ['N' => 1], 'bar' => ['N' => 2]];
         } else {
             $expFormatted = $formatted;
         }
@@ -63,19 +68,14 @@ class DynamoDbHandlerTest extends TestCase
              ->expects($this->once())
              ->method('format')
              ->with($record)
-             ->will($this->returnValue($formatted));
-        $this->client
-             ->expects($isV3 ? $this->never() : $this->once())
-             ->method('formatAttributes')
-             ->with($this->isType('array'))
-             ->will($this->returnValue($formatted));
+             ->willReturn($formatted);
         $this->client
              ->expects($this->once())
              ->method('__call')
-             ->with('putItem', array(array(
+             ->with('putItem', [[
                  'TableName' => 'foo',
                  'Item' => $expFormatted,
-             )));
+             ]]);
 
         $handler->handle($record);
     }

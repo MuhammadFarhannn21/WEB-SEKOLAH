@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /*
  * This file is part of PHPUnit.
  *
@@ -7,9 +7,13 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-class SampleArrayAccess implements ArrayAccess
+namespace PHPUnit\TestFixture;
+
+use ArrayAccess;
+
+final class SampleArrayAccess implements ArrayAccess
 {
-    private $container;
+    private array $container;
 
     public function __construct()
     {
@@ -25,7 +29,7 @@ class SampleArrayAccess implements ArrayAccess
         }
     }
 
-    public function offsetExists($offset)
+    public function offsetExists($offset): bool
     {
         return isset($this->container[$offset]);
     }
@@ -35,7 +39,7 @@ class SampleArrayAccess implements ArrayAccess
         unset($this->container[$offset]);
     }
 
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
         return $this->container[$offset] ?? null;
     }

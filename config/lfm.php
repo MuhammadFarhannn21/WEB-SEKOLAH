@@ -24,9 +24,9 @@ return [
     */
 
     // If true, private folders will be created for each signed-in user.
-    'allow_multi_user' => true,
+    'allow_multi_user' => false,
     // If true, share folder will be created when allow_multi_user is true.
-    'allow_share_folder' => true,
+    'allow_share_folder' => false,
 
     // Flexible way to customize client folders accessibility
     // If you want to customize client folders, publish tag="lfm_handler"
@@ -185,5 +185,33 @@ return [
     'php_ini_overrides' => [
         'memory_limit'        => '256M',
     ],
+
+    /*
+|--------------------------------------------------------------------------
+| Folder Categories
+|--------------------------------------------------------------------------
+*/
+'folder_categories' => [
+    'file' => [
+        'valid_mime' => [
+            'image/jpeg',
+            'image/pjpeg',
+            'image/png',
+            'image/gif',
+            'image/svg+xml',
+            'application/pdf',
+            'text/plain',
+        ],
+    ],
+    'image' => [
+        'valid_mime' => [
+            'image/jpeg',
+            'image/pjpeg',
+            'image/png',
+            'image/gif',
+            'image/svg+xml',
+        ],
+    ],
+],
 
 ];

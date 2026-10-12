@@ -1,18 +1,3 @@
-<script type="text/javascript">
-    (function () {
-        var options = {
-            whatsapp: " {{ \App\Aplikasi::first()->telepon }}", // WhatsApp number
-            email: "{{ \App\Aplikasi::first()->email }}", // Email
-            button_color: "#129BF4", // Color of button
-            position: "right", // Position may be 'right' or 'left'
-            order: "whatsapp,email", // Order of buttons
-        };
-        var proto = document.location.protocol, host = "whatshelp.io", url = proto + "//static." + host;
-        var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = url + '/widget-send-button/js/init.js';
-        s.onload = function () { WhWidgetSendButton.init(host, proto, options); };
-        var x = document.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x);
-    })();
-</script>
 <script src="{{ asset('frontend/js/jquery.min.js') }}"></script>
 <script src="{{ asset('frontend/js/jquery-migrate.min.js') }}"></script>
 <script src="{{ asset('frontend/js/popper.min.js') }}"></script>
@@ -33,6 +18,7 @@
 <script src="{{ asset('frontend/js/jquery.scrollUp.min.js') }}"></script>
 <script src="{{ asset('frontend/js/gmaps.min.js') }}"></script>
 <script src="{{ asset('frontend/js/main.js') }}"></script>
+<script src="{{ asset('frontend/js/modern.js') }}?v=3"></script>
 <script src="{{ asset('vendor/sweetalert/sweetalert.all.js') }}"></script>
 
 @include('sweetalert::alert')

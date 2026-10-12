@@ -13,6 +13,7 @@ namespace Symfony\Component\HttpKernel\Tests\ControllerMetadata;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadata;
+use Symfony\Component\HttpKernel\Tests\Fixtures\Attribute\Foo;
 
 class ArgumentMetadataTest extends TestCase
 {
@@ -32,15 +33,25 @@ class ArgumentMetadataTest extends TestCase
         $this->assertSame('default value', $argument->getDefaultValue());
     }
 
-    /**
-     * @expectedException \LogicException
-     */
     public function testDefaultValueUnavailable()
     {
+        $this->expectException(\LogicException::class);
         $argument = new ArgumentMetadata('foo', 'string', false, false, null, false);
 
         $this->assertFalse($argument->isNullable());
         $this->assertFalse($argument->hasDefaultValue());
         $argument->getDefaultValue();
+    }
+
+    public function testGetAttributes()
+    {
+        $argument = new ArgumentMetadata('foo', 'string', false, true, 'default value', true, [new Foo('bar')]);
+        $this->assertEquals([new Foo('bar')], $argument->getAttributes());
+    }
+
+    public function testGetAttributesOfType()
+    {
+        $argument = new ArgumentMetadata('foo', 'string', false, true, 'default value', true, [new Foo('bar')]);
+        $this->assertEquals([new Foo('bar')], $argument->getAttributesOfType(Foo::class));
     }
 }

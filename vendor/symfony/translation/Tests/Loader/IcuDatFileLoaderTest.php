@@ -11,21 +11,20 @@
 
 namespace Symfony\Component\Translation\Tests\Loader;
 
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use Symfony\Component\Config\Resource\FileResource;
+use Symfony\Component\Translation\Exception\InvalidResourceException;
+use Symfony\Component\Translation\Exception\NotFoundResourceException;
 use Symfony\Component\Translation\Loader\IcuDatFileLoader;
 
-/**
- * @requires extension intl
- */
+#[RequiresPhpExtension('intl')]
 class IcuDatFileLoaderTest extends LocalizedTestCase
 {
-    /**
-     * @expectedException \Symfony\Component\Translation\Exception\InvalidResourceException
-     */
     public function testLoadInvalidResource()
     {
-        $loader = new IcuDatFileLoader();
-        $loader->load(__DIR__.'/../fixtures/resourcebundle/corrupted/resources', 'es', 'domain2');
+        $this->expectException(InvalidResourceException::class);
+
+        (new IcuDatFileLoader())->load(__DIR__.'/../Fixtures/resourcebundle/corrupted/resources', 'es', 'domain2');
     }
 
     public function testDatEnglishLoad()
@@ -34,7 +33,7 @@ class IcuDatFileLoaderTest extends LocalizedTestCase
         // you must specify an temporary build directory which is not the same as current directory and
         // MUST reside on the same partition. pkgdata -p resources -T /srv -d.packagelist.txt
         $loader = new IcuDatFileLoader();
-        $resource = __DIR__.'/../fixtures/resourcebundle/dat/resources';
+        $resource = __DIR__.'/../Fixtures/resourcebundle/dat/resources';
         $catalogue = $loader->load($resource, 'en', 'domain1');
 
         $this->assertEquals(['symfony' => 'Symfony 2 is great'], $catalogue->all('domain1'));
@@ -45,7 +44,7 @@ class IcuDatFileLoaderTest extends LocalizedTestCase
     public function testDatFrenchLoad()
     {
         $loader = new IcuDatFileLoader();
-        $resource = __DIR__.'/../fixtures/resourcebundle/dat/resources';
+        $resource = __DIR__.'/../Fixtures/resourcebundle/dat/resources';
         $catalogue = $loader->load($resource, 'fr', 'domain1');
 
         $this->assertEquals(['symfony' => 'Symfony 2 est génial'], $catalogue->all('domain1'));
@@ -53,12 +52,10 @@ class IcuDatFileLoaderTest extends LocalizedTestCase
         $this->assertEquals([new FileResource($resource.'.dat')], $catalogue->getResources());
     }
 
-    /**
-     * @expectedException \Symfony\Component\Translation\Exception\NotFoundResourceException
-     */
     public function testLoadNonExistingResource()
     {
-        $loader = new IcuDatFileLoader();
-        $loader->load(__DIR__.'/../fixtures/non-existing.txt', 'en', 'domain1');
+        $this->expectException(NotFoundResourceException::class);
+
+        (new IcuDatFileLoader())->load(__DIR__.'/../Fixtures/non-existing.txt', 'en', 'domain1');
     }
 }

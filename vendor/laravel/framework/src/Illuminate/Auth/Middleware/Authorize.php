@@ -3,8 +3,11 @@
 namespace Illuminate\Auth\Middleware;
 
 use Closure;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Auth\Access\Gate;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+
+use function Illuminate\Support\enum_value;
 
 class Authorize
 {
@@ -24,6 +27,18 @@ class Authorize
     public function __construct(Gate $gate)
     {
         $this->gate = $gate;
+    }
+
+    /**
+     * Specify the ability and models for the middleware.
+     *
+     * @param  \UnitEnum|string  $ability
+     * @param  string  ...$models
+     * @return string
+     */
+    public static function using($ability, ...$models)
+    {
+        return static::class.':'.implode(',', [enum_value($ability), ...$models]);
     }
 
     /**
@@ -50,7 +65,7 @@ class Authorize
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  array|null  $models
-     * @return array|string|\Illuminate\Database\Eloquent\Model
+     * @return array
      */
     protected function getGateArguments($request, $models)
     {
@@ -58,9 +73,9 @@ class Authorize
             return [];
         }
 
-        return collect($models)->map(function ($model) use ($request) {
-            return $model instanceof Model ? $model : $this->getModel($request, $model);
-        })->all();
+        return (new Collection($models))
+            ->map(fn ($model) => $model instanceof Model ? $model : $this->getModel($request, $model))
+            ->all();
     }
 
     /**
@@ -72,7 +87,12 @@ class Authorize
      */
     protected function getModel($request, $model)
     {
-        return $this->isClassName($model) ? trim($model) : $request->route($model, $model);
+        if ($this->isClassName($model)) {
+            return trim($model);
+        }
+
+        return $request->route($model, null) ??
+            ((preg_match("/^['\"](.*)['\"]$/", trim($model), $matches)) ? $matches[1] : null);
     }
 
     /**
@@ -83,6 +103,6 @@ class Authorize
      */
     protected function isClassName($value)
     {
-        return strpos($value, '\\') !== false;
+        return str_contains($value, '\\');
     }
 }

@@ -3,10 +3,12 @@
 namespace Illuminate\Validation\Rules;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Traits\Conditionable;
+use Stringable;
 
-class Unique
+class Unique implements Stringable
 {
-    use DatabaseRule;
+    use Conditionable, DatabaseRule;
 
     /**
      * The ID that should be ignored.
@@ -66,7 +68,7 @@ class Unique
         return rtrim(sprintf('unique:%s,%s,%s,%s,%s',
             $this->table,
             $this->column,
-            $this->ignore ? '"'.$this->ignore.'"' : 'NULL',
+            $this->ignore ? '"'.addslashes($this->ignore).'"' : 'NULL',
             $this->idColumn,
             $this->formatWheres()
         ), ',');

@@ -3,9 +3,12 @@
 namespace Illuminate\Foundation\Testing;
 
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Foundation\Testing\Traits\CanConfigureMigrationCommands;
 
 trait RefreshDatabase
 {
+    use CanConfigureMigrationCommands;
+
     /**
      * Define hooks to migrate the database before and after each test.
      *
@@ -13,9 +16,15 @@ trait RefreshDatabase
      */
     public function refreshDatabase()
     {
-        $this->usingInMemoryDatabase()
-                        ? $this->refreshInMemoryDatabase()
-                        : $this->refreshTestDatabase();
+        $this->beforeRefreshingDatabase();
+
+        if ($this->usingInMemoryDatabase()) {
+            $this->restoreInMemoryDatabase();
+        }
+
+        $this->refreshTestDatabase();
+
+        $this->afterRefreshingDatabase();
     }
 
     /**
@@ -31,15 +40,19 @@ trait RefreshDatabase
     }
 
     /**
-     * Refresh the in-memory database.
+     * Restore the in-memory database between tests.
      *
      * @return void
      */
-    protected function refreshInMemoryDatabase()
+    protected function restoreInMemoryDatabase()
     {
-        $this->artisan('migrate');
+        $database = $this->app->make('db');
 
-        $this->app[Kernel::class]->setArtisan(null);
+        foreach ($this->connectionsToTransact() as $name) {
+            if (isset(RefreshDatabaseState::$inMemoryConnections[$name])) {
+                $database->connection($name)->setPdo(RefreshDatabaseState::$inMemoryConnections[$name]);
+            }
+        }
     }
 
     /**
@@ -50,9 +63,7 @@ trait RefreshDatabase
     protected function refreshTestDatabase()
     {
         if (! RefreshDatabaseState::$migrated) {
-            $this->artisan('migrate:fresh', $this->shouldDropViews() ? [
-                '--drop-views' => true,
-            ] : []);
+            $this->artisan('migrate:fresh', $this->migrateFreshUsing());
 
             $this->app[Kernel::class]->setArtisan(null);
 
@@ -71,8 +82,19 @@ trait RefreshDatabase
     {
         $database = $this->app->make('db');
 
-        foreach ($this->connectionsToTransact() as $name) {
+        $connections = $this->connectionsToTransact();
+
+        $this->app->instance('db.transactions', $transactionsManager = new DatabaseTransactionsManager($connections));
+
+        foreach ($connections as $name) {
             $connection = $database->connection($name);
+
+            $connection->setTransactionManager($transactionsManager);
+
+            if ($this->usingInMemoryDatabase()) {
+                RefreshDatabaseState::$inMemoryConnections[$name] ??= $connection->getPdo();
+            }
+
             $dispatcher = $connection->getEventDispatcher();
 
             $connection->unsetEventDispatcher();
@@ -86,7 +108,12 @@ trait RefreshDatabase
                 $dispatcher = $connection->getEventDispatcher();
 
                 $connection->unsetEventDispatcher();
-                $connection->rollback();
+
+                if ($connection->getPdo() && ! $connection->getPdo()->inTransaction()) {
+                    RefreshDatabaseState::$migrated = false;
+                }
+
+                $connection->rollBack();
                 $connection->setEventDispatcher($dispatcher);
                 $connection->disconnect();
             }
@@ -105,13 +132,22 @@ trait RefreshDatabase
     }
 
     /**
-     * Determine if views should be dropped when refreshing the database.
+     * Perform any work that should take place before the database has started refreshing.
      *
-     * @return bool
+     * @return void
      */
-    protected function shouldDropViews()
+    protected function beforeRefreshingDatabase()
     {
-        return property_exists($this, 'dropViews')
-                            ? $this->dropViews : false;
+        // ...
+    }
+
+    /**
+     * Perform any work that should take place once the database has finished refreshing.
+     *
+     * @return void
+     */
+    protected function afterRefreshingDatabase()
+    {
+        // ...
     }
 }

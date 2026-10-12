@@ -7,19 +7,20 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-
 namespace SebastianBergmann\Diff;
 
+use LogicException;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Small;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers SebastianBergmann\Diff\InvalidArgumentException
- */
+#[CoversClass(InvalidArgumentException::class)]
+#[Small]
 final class InvalidArgumentExceptionTest extends TestCase
 {
     public function testInvalidArgumentException(): void
     {
-        $previousException = new \LogicException();
+        $previousException = new LogicException;
         $message           = 'test';
         $code              = 123;
 

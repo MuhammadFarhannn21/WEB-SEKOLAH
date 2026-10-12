@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\HttpKernel\Tests\DataCollector;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,21 +24,20 @@ class MemoryDataCollectorTest extends TestCase
         $collector = new MemoryDataCollector();
         $collector->collect(new Request(), new Response());
 
-        $this->assertInternalType('integer', $collector->getMemory());
-        $this->assertInternalType('integer', $collector->getMemoryLimit());
+        $this->assertIsInt($collector->getMemory());
+        $this->assertIsInt($collector->getMemoryLimit());
         $this->assertSame('memory', $collector->getName());
     }
 
-    /** @dataProvider getBytesConversionTestData */
+    #[DataProvider('getBytesConversionTestData')]
     public function testBytesConversion($limit, $bytes)
     {
         $collector = new MemoryDataCollector();
         $method = new \ReflectionMethod($collector, 'convertToBytes');
-        $method->setAccessible(true);
         $this->assertEquals($bytes, $method->invoke($collector, $limit));
     }
 
-    public function getBytesConversionTestData()
+    public static function getBytesConversionTestData()
     {
         return [
             ['2k', 2048],

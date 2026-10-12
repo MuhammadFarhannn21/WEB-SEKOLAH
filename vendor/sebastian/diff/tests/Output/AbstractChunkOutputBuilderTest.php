@@ -7,52 +7,24 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-
 namespace SebastianBergmann\Diff\Output;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\Diff\Differ;
+use SebastianBergmann\Diff\TimeEfficientLongestCommonSubsequenceCalculator;
 
-/**
- * @covers SebastianBergmann\Diff\Output\AbstractChunkOutputBuilder
- *
- * @uses SebastianBergmann\Diff\Differ
- * @uses SebastianBergmann\Diff\Output\UnifiedDiffOutputBuilder
- * @uses SebastianBergmann\Diff\TimeEfficientLongestCommonSubsequenceCalculator
- */
+#[CoversClass(AbstractChunkOutputBuilder::class)]
+#[UsesClass(Differ::class)]
+#[UsesClass(UnifiedDiffOutputBuilder::class)]
+#[UsesClass(TimeEfficientLongestCommonSubsequenceCalculator::class)]
 final class AbstractChunkOutputBuilderTest extends TestCase
 {
-    /**
-     * @param array  $expected
-     * @param string $from
-     * @param string $to
-     * @param int    $lineThreshold
-     *
-     * @dataProvider provideGetCommonChunks
-     */
-    public function testGetCommonChunks(array $expected, string $from, string $to, int $lineThreshold = 5): void
+    public static function provideGetCommonChunks(): array
     {
-        $output = new class extends AbstractChunkOutputBuilder {
-            public function getDiff(array $diff): string
-            {
-                return '';
-            }
-
-            public function getChunks(array $diff, $lineThreshold)
-            {
-                return $this->getCommonChunks($diff, $lineThreshold);
-            }
-        };
-
-        $this->assertSame(
-            $expected,
-            $output->getChunks((new Differ)->diffToArray($from, $to), $lineThreshold)
-        );
-    }
-
-    public function provideGetCommonChunks(): array
-    {
-        return[
+        return [
             'same (with default threshold)' => [
                 [],
                 'A',
@@ -148,5 +120,27 @@ final class AbstractChunkOutputBuilderTest extends TestCase
                 "A\nA\nA\nA\nA\nA\nB\nC\nC\nC\nC\nC\nC\nY",
             ],
         ];
+    }
+
+    #[DataProvider('provideGetCommonChunks')]
+    public function testGetCommonChunks(array $expected, string $from, string $to, int $lineThreshold = 5): void
+    {
+        $output = new class extends AbstractChunkOutputBuilder
+        {
+            public function getDiff(array $diff): string
+            {
+                return '';
+            }
+
+            public function getChunks(array $diff, $lineThreshold)
+            {
+                return $this->getCommonChunks($diff, $lineThreshold);
+            }
+        };
+
+        $this->assertSame(
+            $expected,
+            $output->getChunks((new Differ(new UnifiedDiffOutputBuilder))->diffToArray($from, $to), $lineThreshold),
+        );
     }
 }

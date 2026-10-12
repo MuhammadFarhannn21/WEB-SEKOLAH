@@ -18,16 +18,16 @@
  * @license    http://github.com/padraic/mockery/blob/master/LICENSE New BSD License
  */
 
-use PHPUnit\Framework\TestCase;
+use Mockery\Adapter\Phpunit\MockeryTestCase;
 
-class GlobalHelpersTest extends TestCase
+class GlobalHelpersTest extends MockeryTestCase
 {
-    public function setup()
+    public function mockeryTestSetUp()
     {
         \Mockery::globalHelpers();
     }
 
-    public function tearDown()
+    public function mockeryTestTearDown()
     {
         \Mockery::close();
     }
@@ -54,7 +54,7 @@ class GlobalHelpersTest extends TestCase
     /** @test */
     public function named_mock_creates_a_named_mock()
     {
-        $className = "Class".uniqid();
+        $className = "Class" . uniqid();
         $double = namedMock($className);
 
         $this->assertInstanceOf(\Mockery\MockInterface::class, $double);

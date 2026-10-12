@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /*
  * This file is part of PHPUnit.
  *
@@ -7,24 +7,9 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-class CoveredParentClass
-{
-    public function publicMethod(): void
-    {
-        $this->protectedMethod();
-    }
+namespace PHPUnit\TestFixture;
 
-    protected function protectedMethod(): void
-    {
-        $this->privateMethod();
-    }
-
-    private function privateMethod(): void
-    {
-    }
-}
-
-class CoveredClass extends CoveredParentClass
+final class CoveredClass extends CoveredParentClass
 {
     public function publicMethod(): void
     {

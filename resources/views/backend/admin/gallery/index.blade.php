@@ -60,9 +60,10 @@
                     </table>
                 </div>
                 <div class="tab-pane p-3" id="profile2" role="tabpanel">
-                    {!! Form::open(['url' => 'admin/gallery/store', 'method' => 'POST']) !!}
-                        @include('backend.admin.gallery._form')
-                    {!! Form::close() !!}
+                <form action="{{ url('admin/gallery/store') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    @include('backend.admin.gallery._form')
+                </form>
                 </div>
 
             </div>

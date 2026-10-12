@@ -1,6 +1,16 @@
-<?php
-
+<?php declare(strict_types = 1);
+/*
+ * This file is part of PharIo\Manifest.
+ *
+ * Copyright (c) Arne Blankerts <arne@blankerts.de>, Sebastian Heuer <sebastian@phpeople.de>, Sebastian Bergmann <sebastian@phpunit.de> and contributors
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ *
+ */
 namespace PharIo\Manifest;
+
+use function file_get_contents;
 
 /**
  * @covers \PharIo\Manifest\ManifestLoader
@@ -43,14 +53,14 @@ namespace PharIo\Manifest;
  * @uses \PharIo\Version\VersionConstraint
  */
 class ManifestLoaderTest extends \PHPUnit\Framework\TestCase {
-    public function testCanBeLoadedFromFile() {
+    public function testCanBeLoadedFromFile(): void {
         $this->assertInstanceOf(
             Manifest::class,
             ManifestLoader::fromFile(__DIR__ . '/_fixture/library.xml')
         );
     }
 
-    public function testCanBeLoadedFromString() {
+    public function testCanBeLoadedFromString(): void {
         $this->assertInstanceOf(
             Manifest::class,
             ManifestLoader::fromString(
@@ -59,15 +69,14 @@ class ManifestLoaderTest extends \PHPUnit\Framework\TestCase {
         );
     }
 
-    public function testCanBeLoadedFromPhar() {
+    public function testCanBeLoadedFromPhar(): void {
         $this->assertInstanceOf(
             Manifest::class,
             ManifestLoader::fromPhar(__DIR__ . '/_fixture/test.phar')
         );
-
     }
 
-    public function testLoadingNonExistingFileThrowsException() {
+    public function testLoadingNonExistingFileThrowsException(): void {
         $this->expectException(ManifestLoaderException::class);
         ManifestLoader::fromFile('/not/existing');
     }
@@ -75,9 +84,8 @@ class ManifestLoaderTest extends \PHPUnit\Framework\TestCase {
     /**
      * @uses \PharIo\Manifest\ManifestDocumentLoadingException
      */
-    public function testLoadingInvalidXmlThrowsException() {
+    public function testLoadingInvalidXmlThrowsException(): void {
         $this->expectException(ManifestLoaderException::class);
         ManifestLoader::fromString('<?xml version="1.0" ?><broken>');
     }
-
 }

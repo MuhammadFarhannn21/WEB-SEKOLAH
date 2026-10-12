@@ -24,10 +24,12 @@ class TimelineController extends Controller
 
     // bagian menyimpan data ke database
     public function store(Request $request){
-    	$timeline = Timeline::create($request->all());
-    	LogAktivity::addToLog(Auth::user()->name.' Membuat Timeline '.$timeline->nama);
-    	toast('Berhasil Menyimpan Data','success','top-right');
-        return redirect()->back();
+    $data = $request->all();
+    $data['body'] = $request->body ?? '-';
+    $timeline = Timeline::create($data);
+    LogAktivity::addToLog(Auth::user()->name.' Membuat Timeline '.$timeline->judul);
+    toast('Berhasil Menyimpan Data','success','top-right');
+    return redirect()->back();
     }
 
     // bagian edit data
@@ -48,7 +50,7 @@ class TimelineController extends Controller
     // bagian menghapus data
     public function delete($id){
     	$timeline = Timeline::findOrFail($id);
-    	LogAktivity::addToLog(Auth::user()->name.' Menghapus Timeline '.$timeline->nama);
+    	LogAktivity::addToLog(Auth::user()->name.' Menghapus Timeline '.$timeline->judul);
     	$timeline->delete();
     	toast('Berhasil Menghapus timeline','success','top-right');
         return redirect()->back();

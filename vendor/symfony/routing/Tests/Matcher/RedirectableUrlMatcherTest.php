@@ -11,6 +11,8 @@
 
 namespace Symfony\Component\Routing\Tests\Matcher;
 
+use Symfony\Component\Routing\Exception\ResourceNotFoundException;
+use Symfony\Component\Routing\Matcher\RedirectableUrlMatcher;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
@@ -22,8 +24,8 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo/'));
 
-        $matcher = $this->getUrlMatcher($coll);
-        $matcher->expects($this->once())->method('redirect')->will($this->returnValue([]));
+        $matcher = $this->getUrlMatcher($coll, null, true);
+        $matcher->expects($this->once())->method('redirect')->willReturn([]);
         $matcher->match('/foo');
     }
 
@@ -32,14 +34,11 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo'));
 
-        $matcher = $this->getUrlMatcher($coll);
-        $matcher->expects($this->once())->method('redirect')->will($this->returnValue([]));
+        $matcher = $this->getUrlMatcher($coll, null, true);
+        $matcher->expects($this->once())->method('redirect')->willReturn([]);
         $matcher->match('/foo/');
     }
 
-    /**
-     * @expectedException \Symfony\Component\Routing\Exception\ResourceNotFoundException
-     */
     public function testRedirectWhenNoSlashForNonSafeMethod()
     {
         $coll = new RouteCollection();
@@ -48,6 +47,9 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $context = new RequestContext();
         $context->setMethod('POST');
         $matcher = $this->getUrlMatcher($coll, $context);
+
+        $this->expectException(ResourceNotFoundException::class);
+
         $matcher->match('/foo');
     }
 
@@ -56,12 +58,12 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo', [], [], [], '', ['FTP', 'HTTPS']));
 
-        $matcher = $this->getUrlMatcher($coll);
+        $matcher = $this->getUrlMatcher($coll, null, true);
         $matcher
             ->expects($this->once())
             ->method('redirect')
             ->with('/foo', 'foo', 'ftp')
-            ->will($this->returnValue(['_route' => 'foo']))
+            ->willReturn(['_route' => 'foo'])
         ;
         $matcher->match('/foo');
     }
@@ -71,7 +73,7 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo', [], [], [], '', ['https', 'http']));
 
-        $matcher = $this->getUrlMatcher($coll);
+        $matcher = $this->getUrlMatcher($coll, null, true);
         $matcher
             ->expects($this->never())
             ->method('redirect');
@@ -83,12 +85,12 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo/{bar}', [], [], [], '', ['https']));
 
-        $matcher = $this->getUrlMatcher($coll);
+        $matcher = $this->getUrlMatcher($coll, null, true);
         $matcher
             ->expects($this->once())
             ->method('redirect')
             ->with('/foo/baz', 'foo', 'https')
-            ->will($this->returnValue(['redirect' => 'value']))
+            ->willReturn(['redirect' => 'value'])
         ;
         $this->assertEquals(['_route' => 'foo', 'bar' => 'baz', 'redirect' => 'value'], $matcher->match('/foo/baz'));
     }
@@ -98,12 +100,12 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/', [], [], [], '', ['https']));
 
-        $matcher = $this->getUrlMatcher($coll);
+        $matcher = $this->getUrlMatcher($coll, null, true);
         $matcher
             ->expects($this->once())
             ->method('redirect')
             ->with('/', 'foo', 'https')
-            ->will($this->returnValue(['redirect' => 'value']));
+            ->willReturn(['redirect' => 'value']);
         $this->assertEquals(['_route' => 'foo', 'redirect' => 'value'], $matcher->match('/'));
     }
 
@@ -112,12 +114,12 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo/{bar}/'));
 
-        $matcher = $this->getUrlMatcher($coll);
+        $matcher = $this->getUrlMatcher($coll, null, true);
         $matcher
             ->expects($this->once())
             ->method('redirect')
             ->with('/foo/baz/', 'foo', null)
-            ->will($this->returnValue(['redirect' => 'value']))
+            ->willReturn(['redirect' => 'value'])
         ;
         $this->assertEquals(['_route' => 'foo', 'bar' => 'baz', 'redirect' => 'value'], $matcher->match('/foo/baz'));
     }
@@ -127,7 +129,7 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo:bar/'));
 
-        $matcher = $this->getUrlMatcher($coll);
+        $matcher = $this->getUrlMatcher($coll, null, true);
         $matcher->expects($this->once())->method('redirect')->with('/foo%3Abar/')->willReturn([]);
         $matcher->match('/foo%3Abar');
     }
@@ -136,7 +138,7 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
     {
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo', [], [], [], '', ['https']));
-        $matcher = $this->getUrlMatcher($coll, new RequestContext());
+        $matcher = $this->getUrlMatcher($coll, new RequestContext(), true);
         $matcher->expects($this->once())->method('redirect')->with('/foo', 'foo', 'https')->willReturn([]);
         $this->assertSame(['_route' => 'foo'], $matcher->match('/foo'));
     }
@@ -147,16 +149,16 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll->add('foo', new Route('/foo/'));
         $coll->add('bar', new Route('/{name}'));
 
-        $matcher = $this->getUrlMatcher($coll);
-        $matcher->expects($this->once())->method('redirect')->with('/foo/', 'foo')->will($this->returnValue(['_route' => 'foo']));
+        $matcher = $this->getUrlMatcher($coll, null, true);
+        $matcher->expects($this->once())->method('redirect')->with('/foo/', 'foo')->willReturn(['_route' => 'foo']);
         $this->assertSame(['_route' => 'foo'], $matcher->match('/foo'));
 
         $coll = new RouteCollection();
         $coll->add('foo', new Route('/foo'));
         $coll->add('bar', new Route('/{name}/'));
 
-        $matcher = $this->getUrlMatcher($coll);
-        $matcher->expects($this->once())->method('redirect')->with('/foo', 'foo')->will($this->returnValue(['_route' => 'foo']));
+        $matcher = $this->getUrlMatcher($coll, null, true);
+        $matcher->expects($this->once())->method('redirect')->with('/foo', 'foo')->willReturn(['_route' => 'foo']);
         $this->assertSame(['_route' => 'foo'], $matcher->match('/foo/'));
     }
 
@@ -165,8 +167,8 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll = new RouteCollection();
         $coll->add('foo', (new Route('/foo/'))->setSchemes(['https']));
 
-        $matcher = $this->getUrlMatcher($coll);
-        $matcher->expects($this->once())->method('redirect')->with('/foo/', 'foo', 'https')->will($this->returnValue([]));
+        $matcher = $this->getUrlMatcher($coll, null, true);
+        $matcher->expects($this->once())->method('redirect')->with('/foo/', 'foo', 'https')->willReturn([]);
         $matcher->match('/foo');
     }
 
@@ -176,7 +178,7 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $coll->add('a', new Route('/api/customers/{customerId}/contactpersons', [], [], [], '', [], ['post']));
         $coll->add('b', new Route('/api/customers/{customerId}/contactpersons/', [], [], [], '', [], ['get']));
 
-        $matcher = $this->getUrlMatcher($coll);
+        $matcher = $this->getUrlMatcher($coll, null, true);
         $expected = [
             '_route' => 'b',
             'customerId' => '123',
@@ -187,8 +189,42 @@ class RedirectableUrlMatcherTest extends UrlMatcherTest
         $this->assertEquals($expected, $matcher->match('/api/customers/123/contactpersons'));
     }
 
-    protected function getUrlMatcher(RouteCollection $routes, RequestContext $context = null)
+    public function testNonGreedyTrailingRequirement()
     {
-        return $this->getMockForAbstractClass('Symfony\Component\Routing\Matcher\RedirectableUrlMatcher', [$routes, $context ?: new RequestContext()]);
+        $coll = new RouteCollection();
+        $coll->add('a', new Route('/{a}', [], ['a' => '\d+']));
+
+        $matcher = $this->getUrlMatcher($coll, null, true);
+        $matcher->expects($this->once())->method('redirect')->with('/123')->willReturn([]);
+
+        $this->assertEquals(['_route' => 'a', 'a' => '123'], $matcher->match('/123/'));
+    }
+
+    public function testTrailingRequirementWithDefaultA()
+    {
+        $coll = new RouteCollection();
+        $coll->add('a', new Route('/fr-fr/{a}', ['a' => 'aaa'], ['a' => '.+']));
+
+        $matcher = $this->getUrlMatcher($coll, null, true);
+        $matcher->expects($this->once())->method('redirect')->with('/fr-fr')->willReturn([]);
+
+        $this->assertEquals(['_route' => 'a', 'a' => 'aaa'], $matcher->match('/fr-fr/'));
+    }
+
+    protected function getUrlMatcher(RouteCollection $routes, ?RequestContext $context = null, bool $mock = false)
+    {
+        if (!$mock) {
+            return new class($routes, $context ?? new RequestContext()) extends RedirectableUrlMatcher {
+                public function redirect(string $path, string $route, ?string $scheme = null): array
+                {
+                    return [];
+                }
+            };
+        }
+
+        return $this->getMockBuilder(RedirectableUrlMatcher::class)
+            ->setConstructorArgs([$routes, $context ?? new RequestContext()])
+            ->onlyMethods(['redirect'])
+            ->getMock();
     }
 }

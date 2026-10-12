@@ -2,14 +2,9 @@
 
 namespace PhpParser;
 
-use PHPUnit\Framework\TestCase;
-
-require_once __DIR__ . '/CodeTestParser.php';
-
-abstract class CodeTestAbstract extends TestCase
-{
-    protected function getTests($directory, $fileExtension, $chunksPerTest = 2) {
-        $parser = new CodeTestParser;
+abstract class CodeTestAbstract extends \PHPUnit\Framework\TestCase {
+    protected static function getTests($directory, $fileExtension, $chunksPerTest = 2) {
+        $parser = new CodeTestParser();
         $allTests = [];
         foreach (filesInDir($directory, $fileExtension) as $fileName => $fileContents) {
             list($name, $tests) = $parser->parseTest($fileContents, $chunksPerTest);
@@ -26,5 +21,22 @@ abstract class CodeTestAbstract extends TestCase
         }
 
         return $allTests;
+    }
+
+    public function parseModeLine(?string $modeLine): array {
+        if ($modeLine === null) {
+            return [];
+        }
+
+        $modes = [];
+        foreach (explode(',', $modeLine) as $mode) {
+            $kv = explode('=', $mode, 2);
+            if (isset($kv[1])) {
+                $modes[$kv[0]] = $kv[1];
+            } else {
+                $modes[$kv[0]] = true;
+            }
+        }
+        return $modes;
     }
 }

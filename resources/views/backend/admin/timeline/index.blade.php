@@ -67,9 +67,10 @@
                     </table>
                 </div>
                 <div class="tab-pane p-3" id="profile2" role="tabpanel">
-                    {!! Form::open(['url' => 'admin/timeline/store', 'method' => 'POST']) !!}
+                    <form action="{{ url('admin/timeline/store') }}" method="POST" enctype="multipart/form-data">
+                        @csrf
                         @include('backend.admin.timeline._form')
-                    {!! Form::close() !!}
+                    </form>
                 </div>
 
             </div>

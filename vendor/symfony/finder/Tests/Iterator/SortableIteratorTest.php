@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Finder\Tests\Iterator;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Finder\Iterator\SortableIterator;
 
 class SortableIteratorTest extends RealIteratorTestCase
@@ -18,30 +19,25 @@ class SortableIteratorTest extends RealIteratorTestCase
     public function testConstructor()
     {
         try {
-            new SortableIterator(new Iterator([]), 'foobar');
+            new SortableIterator(new Iterator([]), -255);
             $this->fail('__construct() throws an \InvalidArgumentException exception if the mode is not valid');
         } catch (\Exception $e) {
-            $this->assertInstanceOf('InvalidArgumentException', $e, '__construct() throws an \InvalidArgumentException exception if the mode is not valid');
+            $this->assertInstanceOf(\InvalidArgumentException::class, $e, '__construct() throws an \InvalidArgumentException exception if the mode is not valid');
         }
     }
 
-    /**
-     * @dataProvider getAcceptData
-     */
+    #[DataProvider('getAcceptData')]
     public function testAccept($mode, $expected)
     {
         if (!\is_callable($mode)) {
             switch ($mode) {
                 case SortableIterator::SORT_BY_ACCESSED_TIME:
-                    if ('\\' === \DIRECTORY_SEPARATOR) {
-                        touch(self::toAbsolute('.git'));
-                    } else {
-                        file_get_contents(self::toAbsolute('.git'));
-                    }
+                    touch(self::toAbsolute('.git'));
                     sleep(1);
-                    file_get_contents(self::toAbsolute('.bar'));
+                    touch(self::toAbsolute('.bar'), time());
                     break;
                 case SortableIterator::SORT_BY_CHANGED_TIME:
+                    sleep(1);
                     file_put_contents(self::toAbsolute('test.php'), 'foo');
                     sleep(1);
                     file_put_contents(self::toAbsolute('test.py'), 'foo');
@@ -71,7 +67,7 @@ class SortableIteratorTest extends RealIteratorTestCase
         }
     }
 
-    public function getAcceptData()
+    public static function getAcceptData()
     {
         $sortByName = [
             '.bar',
@@ -79,6 +75,7 @@ class SortableIteratorTest extends RealIteratorTestCase
             '.foo/.bar',
             '.foo/bar',
             '.git',
+            'Zephire.php',
             'foo',
             'foo bar',
             'foo/bar.tmp',
@@ -95,6 +92,7 @@ class SortableIteratorTest extends RealIteratorTestCase
             'test.py',
             'toto',
             'toto/.git',
+            'zebulon.php',
         ];
 
         $sortByType = [
@@ -107,6 +105,7 @@ class SortableIteratorTest extends RealIteratorTestCase
             '.bar',
             '.foo/.bar',
             '.foo/bar',
+            'Zephire.php',
             'foo bar',
             'foo/bar.tmp',
             'qux/baz_100_1.py',
@@ -119,6 +118,7 @@ class SortableIteratorTest extends RealIteratorTestCase
             'qux_2_0.php',
             'test.php',
             'test.py',
+            'zebulon.php',
         ];
 
         $sortByAccessedTime = [
@@ -131,6 +131,7 @@ class SortableIteratorTest extends RealIteratorTestCase
                 '.foo/.bar',
                 '.foo/bar',
                 'test.py',
+                'Zephire.php',
                 'foo',
                 'toto',
                 'toto/.git',
@@ -144,6 +145,7 @@ class SortableIteratorTest extends RealIteratorTestCase
                 'qux_10_2.php',
                 'qux_12_0.php',
                 'qux_2_0.php',
+                'zebulon.php',
             ],
             // This file was accessed after sleeping for 1 sec
             ['.bar'],
@@ -156,6 +158,7 @@ class SortableIteratorTest extends RealIteratorTestCase
                 '.foo/.bar',
                 '.foo/bar',
                 '.bar',
+                'Zephire.php',
                 'foo',
                 'foo/bar.tmp',
                 'toto',
@@ -170,6 +173,7 @@ class SortableIteratorTest extends RealIteratorTestCase
                 'qux_10_2.php',
                 'qux_12_0.php',
                 'qux_2_0.php',
+                'zebulon.php',
             ],
             ['test.php'],
             ['test.py'],
@@ -182,6 +186,7 @@ class SortableIteratorTest extends RealIteratorTestCase
                 '.foo/.bar',
                 '.foo/bar',
                 '.bar',
+                'Zephire.php',
                 'foo',
                 'foo/bar.tmp',
                 'toto',
@@ -196,6 +201,7 @@ class SortableIteratorTest extends RealIteratorTestCase
                 'qux_10_2.php',
                 'qux_12_0.php',
                 'qux_2_0.php',
+                'zebulon.php',
             ],
             ['test.php'],
             ['test.py'],
@@ -207,6 +213,7 @@ class SortableIteratorTest extends RealIteratorTestCase
             '.foo/.bar',
             '.foo/bar',
             '.git',
+            'Zephire.php',
             'foo',
             'foo/bar.tmp',
             'foo bar',
@@ -223,6 +230,7 @@ class SortableIteratorTest extends RealIteratorTestCase
             'test.py',
             'toto',
             'toto/.git',
+            'zebulon.php',
         ];
 
         $customComparison = [
@@ -231,6 +239,7 @@ class SortableIteratorTest extends RealIteratorTestCase
             '.foo/.bar',
             '.foo/bar',
             '.git',
+            'Zephire.php',
             'foo',
             'foo bar',
             'foo/bar.tmp',
@@ -247,16 +256,17 @@ class SortableIteratorTest extends RealIteratorTestCase
             'test.py',
             'toto',
             'toto/.git',
+            'zebulon.php',
         ];
 
         return [
-            [SortableIterator::SORT_BY_NAME, $this->toAbsolute($sortByName)],
-            [SortableIterator::SORT_BY_TYPE, $this->toAbsolute($sortByType)],
-            [SortableIterator::SORT_BY_ACCESSED_TIME, $this->toAbsolute($sortByAccessedTime)],
-            [SortableIterator::SORT_BY_CHANGED_TIME, $this->toAbsolute($sortByChangedTime)],
-            [SortableIterator::SORT_BY_MODIFIED_TIME, $this->toAbsolute($sortByModifiedTime)],
-            [SortableIterator::SORT_BY_NAME_NATURAL, $this->toAbsolute($sortByNameNatural)],
-            [function (\SplFileInfo $a, \SplFileInfo $b) { return strcmp($a->getRealPath(), $b->getRealPath()); }, $this->toAbsolute($customComparison)],
+            [SortableIterator::SORT_BY_NAME, self::toAbsolute($sortByName)],
+            [SortableIterator::SORT_BY_TYPE, self::toAbsolute($sortByType)],
+            [SortableIterator::SORT_BY_ACCESSED_TIME, self::toAbsolute($sortByAccessedTime)],
+            [SortableIterator::SORT_BY_CHANGED_TIME, self::toAbsolute($sortByChangedTime)],
+            [SortableIterator::SORT_BY_MODIFIED_TIME, self::toAbsolute($sortByModifiedTime)],
+            [SortableIterator::SORT_BY_NAME_NATURAL, self::toAbsolute($sortByNameNatural)],
+            [fn (\SplFileInfo $a, \SplFileInfo $b) => strcmp($a->getRealPath(), $b->getRealPath()), self::toAbsolute($customComparison)],
         ];
     }
 }

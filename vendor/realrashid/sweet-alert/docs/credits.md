@@ -1,6 +1,8 @@
-## Credits
+# Credits
 
 *   [SweetAlert2](https://github.com/sweetalert2/sweetalert2)
+
+* Logo design by [Eric L. Barnes](https://ericlbarnes.com)
 
 # Contributing
 
@@ -8,7 +10,7 @@ Please see [CONTRIBUTING](https://github.com/realrashid/sweet-alert/blob/master/
 
 # Connect with Me
 
-*   Website: http://realrashid.com
+*   Website: https://realrashid.dev
 *   Email: realrashid05@gmail.com
 *   Twitter: http://twitter.com/rashidali05
 *   Facebook: https://www.facebook.com/rashidali05
@@ -18,4 +20,4 @@ Please see [CONTRIBUTING](https://github.com/realrashid/sweet-alert/blob/master/
 
 SweetAlert2 is open-sourced software licensed under the MIT License (MIT). Please see [License File](LICENSE.md) for more information.
 
-<p align="center"> <b>Made :heart: with Pakistan<b> </p>
+<p align="center"> <b>Made with ❤️ from Pakistan<b> </p>

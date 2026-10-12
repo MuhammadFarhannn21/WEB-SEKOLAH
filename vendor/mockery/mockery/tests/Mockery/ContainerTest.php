@@ -23,9 +23,12 @@ use Mockery\Generator\MockConfigurationBuilder;
 use Mockery\Adapter\Phpunit\MockeryTestCase;
 use Mockery\MockInterface;
 use Mockery\Exception\BadMethodCallException;
+use test\Mockery\RegExpCompatability;
 
 class ContainerTest extends MockeryTestCase
 {
+    use RegExpCompatability;
+
     public function testSimplestMockCreation()
     {
         $m = mock();
@@ -37,7 +40,7 @@ class ContainerTest extends MockeryTestCase
     {
         $m = mock();
         $m->shouldReceive('foo->bar');
-        $this->assertRegExp(
+        $this->assertMatchesRegEx(
             '/Mockery_(\d+)__demeter_([0-9a-f]+)_foo/',
             Mockery::getContainer()->getKeyOfDemeterMockFor('foo', get_class($m))
         );
@@ -58,12 +61,12 @@ class ContainerTest extends MockeryTestCase
 
     public function testNamedMocksAddNameToExceptions()
     {
-        $m = mock('Foo');
+        $m = mock(__FUNCTION__);
         $m->shouldReceive('foo')->with(1)->andReturn('bar');
         try {
             $m->foo();
         } catch (\Mockery\Exception $e) {
-            $this->assertTrue((bool) preg_match("/Foo/", $e->getMessage()));
+            self::assertStringContainsString(__FUNCTION__, $e->getMessage());
         }
     }
 
@@ -89,20 +92,20 @@ class ContainerTest extends MockeryTestCase
 
     public function testNamedMockWithArrayDefs()
     {
-        $m = mock('Foo', array('foo'=>1, 'bar'=>2));
+        $m = mock(__FUNCTION__, array('foo'=>1, 'bar'=>2));
         $this->assertEquals(1, $m->foo());
         $this->assertEquals(2, $m->bar());
         try {
             $m->f();
         } catch (BadMethodCallException $e) {
-            $this->assertTrue((bool) preg_match("/Foo/", $e->getMessage()));
+            self::assertStringContainsString(__FUNCTION__, $e->getMessage());
         }
     }
 
     public function testNamedMockWithArrayDefsCanBeOverridden()
     {
         // eg. In shared test setup
-        $m = mock('Foo', array('foo' => 1));
+        $m = mock(__FUNCTION__, array('foo' => 1));
 
         // and then overridden in one test
         $m->shouldReceive('foo')->with('bar')->once()->andReturn(2);
@@ -112,7 +115,7 @@ class ContainerTest extends MockeryTestCase
         try {
             $m->f();
         } catch (BadMethodCallException $e) {
-            $this->assertTrue((bool) preg_match("/Foo/", $e->getMessage()));
+            self::assertStringContainsString(__FUNCTION__, $e->getMessage());
         }
     }
 
@@ -172,13 +175,11 @@ class ContainerTest extends MockeryTestCase
         $this->assertEquals(123, $m->bar());
     }
 
-    /**
-     * @expectedException BadMethodCallException
-     */
     public function testNamedMockWithMakePartialThrowsIfNotAvailable()
     {
         $m = mock("MockeryTest_ClassConstructor2", array($param1 = new stdClass()));
         $m->makePartial();
+        $this->expectException(\BadMethodCallException::class);
         $m->foorbar123();
         $m->mockery_verify();
     }
@@ -199,7 +200,7 @@ class ContainerTest extends MockeryTestCase
 
     public function testMockingAConcreteObjectCreatesAPartialWithoutError()
     {
-        $m = mock(new stdClass);
+        $m = mock(new stdClass());
         $m->shouldReceive('foo')->andReturn('bar');
         $this->assertEquals('bar', $m->foo());
         $this->assertInstanceOf(stdClass::class, $m);
@@ -207,7 +208,7 @@ class ContainerTest extends MockeryTestCase
 
     public function testCreatingAPartialAllowsDynamicExpectationsAndPassesThroughUnexpectedMethods()
     {
-        $m = mock(new MockeryTestFoo);
+        $m = mock(new MockeryTestFoo());
         $m->shouldReceive('bar')->andReturn('bar');
         $this->assertEquals('bar', $m->bar());
         $this->assertEquals('foo', $m->foo());
@@ -216,7 +217,7 @@ class ContainerTest extends MockeryTestCase
 
     public function testCreatingAPartialAllowsExpectationsToInterceptCallsToImplementedMethods()
     {
-        $m = mock(new MockeryTestFoo2);
+        $m = mock(new MockeryTestFoo2());
         $m->shouldReceive('bar')->andReturn('baz');
         $this->assertEquals('baz', $m->bar());
         $this->assertEquals('foo', $m->foo());
@@ -225,13 +226,13 @@ class ContainerTest extends MockeryTestCase
 
     public function testBlockForwardingToPartialObject()
     {
-        $m = mock(new MockeryTestBar1, array('foo'=>1, Mockery\Container::BLOCKS => array('method1')));
+        $m = mock(new MockeryTestBar1(), array('foo'=>1, Mockery\Container::BLOCKS => array('method1')));
         $this->assertSame($m, $m->method1());
     }
 
     public function testPartialWithArrayDefs()
     {
-        $m = mock(new MockeryTestBar1, array('foo'=>1, Mockery\Container::BLOCKS => array('method1')));
+        $m = mock(new MockeryTestBar1(), array('foo'=>1, Mockery\Container::BLOCKS => array('method1')));
         $this->assertEquals(1, $m->foo());
     }
 
@@ -243,11 +244,9 @@ class ContainerTest extends MockeryTestCase
         $this->assertEquals('bar', $m->foo());
     }
 
-    /**
-     * @expectedException \Mockery\Exception
-     */
     public function testMockingAKnownConcreteFinalClassThrowsErrors_OnlyPartialMocksCanMockFinalElements()
     {
+        $this->expectException(\Mockery\Exception::class);
         $m = mock('MockeryFoo3');
     }
 
@@ -261,7 +260,7 @@ class ContainerTest extends MockeryTestCase
      */
     public function testFinalClassesCanBePartialMocks()
     {
-        $m = mock(new MockeryFoo3);
+        $m = mock(new MockeryFoo3());
         $m->shouldReceive('foo')->andReturn('baz');
         $this->assertEquals('baz', $m->foo());
         $this->assertNotInstanceOf(MockeryFoo3::class, $m);
@@ -286,7 +285,7 @@ class ContainerTest extends MockeryTestCase
 
     public function testClassesWithFinalMethodsCanBeProxyPartialMocks()
     {
-        $m = mock(new MockeryFoo4);
+        $m = mock(new MockeryFoo4());
         $m->shouldReceive('foo')->andReturn('baz');
         $this->assertEquals('baz', $m->foo());
         $this->assertEquals('bar', $m->bar());
@@ -323,7 +322,7 @@ class ContainerTest extends MockeryTestCase
         $this->assertEquals('foo', $file->getFilename());
         $this->assertEquals('path/to/foo', $file->getPathname());
         $this->assertEquals('css', $file->getExtension());
-        $this->assertInternalType('int', $file->getMTime());
+        $this->assertTrue(is_int($file->getMTime()));
     }
 
     public function testCanMockInterface()
@@ -423,7 +422,6 @@ class ContainerTest extends MockeryTestCase
     }
 
     /**
-     * @expectedException \Mockery\Exception
      * @group partial
      */
     public function testThrowsExceptionIfSettingExpectationForNonMockedMethodOfPartialMock()
@@ -431,16 +429,55 @@ class ContainerTest extends MockeryTestCase
         $this->markTestSkipped('For now...');
         $m = mock('MockeryTest_PartialNormalClass[foo]');
         $this->assertInstanceOf(MockeryTest_PartialNormalClass::class, $m);
+        $this->expectException(\Mockery\Exception::class);
         $m->shouldReceive('bar')->andReturn('cba');
     }
 
     /**
-     * @expectedException \Mockery\Exception
      * @group partial
      */
     public function testThrowsExceptionIfClassOrInterfaceForPartialMockDoesNotExist()
     {
+        $this->expectException(\Mockery\Exception::class);
         $m = mock('MockeryTest_PartialNormalClassXYZ[foo]');
+    }
+
+    /**
+     * @group partial
+     */
+    public function testCanUseExclamationToBlacklistMethod()
+    {
+        $m = mock('MockeryTest_PartialNormalClass2[!foo]');
+        $this->assertSame('abc', $m->foo());
+    }
+
+    /**
+     * @group partial
+     */
+    public function testCantCallMethodWhenUsingBlacklistAndNoExpectation()
+    {
+        $m = mock('MockeryTest_PartialNormalClass2[!foo]');
+        $this->expectException(BadMethodCallException::class);
+        $this->expectExceptionMessageRegEx('/::bar\(\), but no expectations were specified/');
+        $m->bar();
+    }
+
+    /**
+     * @group partial
+     */
+    public function testCanUseBlacklistAndExpectionOnNonBlacklistedMethod()
+    {
+        $m = mock('MockeryTest_PartialNormalClass2[!foo]');
+        $m->shouldReceive('bar')->andReturn('test')->once();
+        $this->assertSame('test', $m->bar());
+    }
+    /**
+     * @group partial
+     */
+    public function testCanUseEmptyMethodlist()
+    {
+        $m = mock('MockeryTest_PartialNormalClass2[]');
+        $this->assertInstanceOf(MockeryTest_PartialNormalClass2::class, $m);
     }
 
     /**
@@ -476,7 +513,7 @@ class ContainerTest extends MockeryTestCase
     public function testCanMockClassUsingMagicCallMethodsInPlaceOfNormalMethods()
     {
         $m = Mockery::mock('Gateway');
-        $m->shouldReceive('iDoSomethingReallyCoolHere');
+        $m->shouldReceive('iDoSomethingReallyCoolHere')->once();
         $m->iDoSomethingReallyCoolHere();
     }
 
@@ -485,8 +522,8 @@ class ContainerTest extends MockeryTestCase
      */
     public function testCanPartialMockObjectUsingMagicCallMethodsInPlaceOfNormalMethods()
     {
-        $m = Mockery::mock(new Gateway);
-        $m->shouldReceive('iDoSomethingReallyCoolHere');
+        $m = Mockery::mock(new Gateway());
+        $m->shouldReceive('iDoSomethingReallyCoolHere')->once();
         $m->iDoSomethingReallyCoolHere();
     }
 
@@ -495,7 +532,7 @@ class ContainerTest extends MockeryTestCase
      */
     public function testCanMockClassWhereMethodHasReferencedParameter()
     {
-        $this->assertInstanceOf(MockInterface::class, Mockery::mock(new MockeryTest_MethodParamRef));
+        $this->assertInstanceOf(MockInterface::class, Mockery::mock(new MockeryTest_MethodParamRef()));
     }
 
     /**
@@ -503,7 +540,7 @@ class ContainerTest extends MockeryTestCase
      */
     public function testCanPartiallyMockObjectWhereMethodHasReferencedParameter()
     {
-        $this->assertInstanceOf(MockInterface::class, Mockery::mock(new MockeryTest_MethodParamRef2));
+        $this->assertInstanceOf(MockInterface::class, Mockery::mock(new MockeryTest_MethodParamRef2()));
     }
 
     /**
@@ -564,12 +601,12 @@ class ContainerTest extends MockeryTestCase
 
     /**
      * @group issue/7
-     * @expectedException \Mockery\CountValidator\Exception
      */
     public function testMockedStaticMethodsObeyMethodCounting()
     {
         $m = mock('alias:MyNamespace\MyClass3');
         $m->shouldReceive('staticFoo')->once()->andReturn('bar');
+        $this->expectException(\Mockery\CountValidator\Exception::class);
         Mockery::close();
     }
 
@@ -578,12 +615,14 @@ class ContainerTest extends MockeryTestCase
     public function testMockedStaticThrowsExceptionWhenMethodDoesNotExist()
     {
         $m = mock('alias:MyNamespace\StaticNoMethod');
+
         try {
             MyNameSpace\StaticNoMethod::staticFoo();
         } catch (BadMethodCallException $e) {
             // Mockery + PHPUnit has a fail safe for tests swallowing our
             // exceptions
             $e->dismiss();
+            self::assertTrue($e->dismissed());
             return;
         }
 
@@ -617,7 +656,7 @@ class ContainerTest extends MockeryTestCase
      */
     public function testMockingAllowsPublicPropertyStubbingOnPartials()
     {
-        $m = mock(new stdClass);
+        $m = mock(new stdClass());
         $m->foo = 'bar';
         $this->assertEquals('bar', $m->foo);
         //$this->assertArrayHasKey('foo', $m->mockery_getMockableProperties());
@@ -628,7 +667,7 @@ class ContainerTest extends MockeryTestCase
      */
     public function testMockingDoesNotStubNonStubbedPropertiesOnPartials()
     {
-        $m = mock(new MockeryTest_ExistingProperty);
+        $m = mock(new MockeryTest_ExistingProperty());
         $this->assertEquals('bar', $m->foo);
         $this->assertArrayNotHasKey('foo', $m->mockery_getMockableProperties());
     }
@@ -642,7 +681,7 @@ class ContainerTest extends MockeryTestCase
     public function testInstantiationOfInstanceMock()
     {
         $m = mock('overload:MyNamespace\MyClass5');
-        $instance = new MyNamespace\MyClass5;
+        $instance = new MyNamespace\MyClass5();
         $this->assertInstanceOf(MyNamespace\MyClass5::class, $instance);
     }
 
@@ -650,7 +689,7 @@ class ContainerTest extends MockeryTestCase
     {
         $m = mock('overload:MyNamespace\MyClass6');
         $m->shouldReceive('foo')->andReturn('bar');
-        $instance = new MyNamespace\MyClass6;
+        $instance = new MyNamespace\MyClass6();
         $this->assertEquals('bar', $instance->foo());
     }
 
@@ -658,7 +697,7 @@ class ContainerTest extends MockeryTestCase
     {
         $m = mock('overload:MyNamespace\MyClass6');
         $m->shouldReceive('foo')->andReturn('bar')->byDefault();
-        $instance = new MyNamespace\MyClass6;
+        $instance = new MyNamespace\MyClass6();
 
         $this->assertEquals('bar', $instance->foo());
     }
@@ -669,7 +708,7 @@ class ContainerTest extends MockeryTestCase
         $m->shouldReceive('foo')->andReturn(1)->byDefault();
         $m->shouldReceive('foo')->andReturn(2)->byDefault();
         $m->shouldReceive('foo')->andReturn(3)->byDefault();
-        $instance = new MyNamespace\MyClass6;
+        $instance = new MyNamespace\MyClass6();
 
         $this->assertEquals(3, $instance->foo());
     }
@@ -680,14 +719,12 @@ class ContainerTest extends MockeryTestCase
         $m->shouldReceive('foo')->once()->andReturn('bar');
     }
 
-    /**
-     * @expectedException \Mockery\CountValidator\Exception
-     */
     public function testInstantiationOfInstanceMocksAddsThemToContainerForVerification()
     {
         $m = mock('overload:MyNamespace\MyClass8');
         $m->shouldReceive('foo')->once();
-        $instance = new MyNamespace\MyClass8;
+        $instance = new MyNamespace\MyClass8();
+        $this->expectException(\Mockery\CountValidator\Exception::class);
         Mockery::close();
     }
 
@@ -695,22 +732,20 @@ class ContainerTest extends MockeryTestCase
     {
         $m = mock('overload:MyNamespace\MyClass9');
         $m->shouldReceive('foo')->once();
-        $instance1 = new MyNamespace\MyClass9;
-        $instance2 = new MyNamespace\MyClass9;
+        $instance1 = new MyNamespace\MyClass9();
+        $instance2 = new MyNamespace\MyClass9();
         $instance1->foo();
         $instance2->foo();
     }
 
-    /**
-     * @expectedException \Mockery\CountValidator\Exception
-     */
     public function testInstantiationOfInstanceMocksDoesNotHaveCountValidatorCrossover2()
     {
         $m = mock('overload:MyNamespace\MyClass10');
         $m->shouldReceive('foo')->once();
-        $instance1 = new MyNamespace\MyClass10;
-        $instance2 = new MyNamespace\MyClass10;
+        $instance1 = new MyNamespace\MyClass10();
+        $instance2 = new MyNamespace\MyClass10();
         $instance1->foo();
+        $this->expectException(\Mockery\CountValidator\Exception::class);
         Mockery::close();
     }
 
@@ -736,7 +771,7 @@ class ContainerTest extends MockeryTestCase
     {
         $m = mock('overload:MyNamespace\MyClass13');
         $m->shouldReceive('foo')->andSet('bar', 'baz');
-        $instance = new MyNamespace\MyClass13;
+        $instance = new MyNamespace\MyClass13();
         $instance->foo();
         $this->assertEquals('baz', $m->bar);
         $this->assertEquals('baz', $instance->bar);
@@ -748,14 +783,11 @@ class ContainerTest extends MockeryTestCase
         $params = [
             'value1' => uniqid('test_')
         ];
-        $m->shouldReceive('__construct')->with($params);
+        $m->shouldReceive('__construct')->with($params)->once();
 
         new MyNamespace\MyClass14($params);
     }
 
-    /**
-     * @expectedException \Mockery\Exception\NoMatchingExpectationException
-     */
     public function testInstantiationOfInstanceMockWithConstructorParameterValidationNegative()
     {
         $m = mock('overload:MyNamespace\MyClass15');
@@ -764,19 +796,18 @@ class ContainerTest extends MockeryTestCase
         ];
         $m->shouldReceive('__construct')->with($params);
 
+        $this->expectException(\Mockery\Exception\NoMatchingExpectationException::class);
         new MyNamespace\MyClass15([]);
     }
 
-    /**
-     * @expectedException \Exception
-     * @expectedExceptionMessageRegExp /^instanceMock \d{3}$/
-     */
     public function testInstantiationOfInstanceMockWithConstructorParameterValidationException()
     {
         $m = mock('overload:MyNamespace\MyClass16');
         $m->shouldReceive('__construct')
-            ->andThrow(new \Exception('instanceMock '.rand(100, 999)));
+            ->andThrow(new \Exception('instanceMock ' . rand(100, 999)));
 
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessageRegEx('/^instanceMock \d{3}$/');
         new MyNamespace\MyClass16();
     }
 
@@ -821,8 +852,14 @@ class ContainerTest extends MockeryTestCase
      */
     public function testCanOverrideExpectedParametersOfInternalPHPClassesToPreserveRefs()
     {
+        if (\PHP_MAJOR_VERSION > 7) {
+            $this->expectException('LogicException');
+        }
+
         Mockery::getConfiguration()->setInternalClassMethodParamMap(
-            'DateTime', 'modify', array('&$string')
+            'DateTime',
+            'modify',
+            array('&$string')
         );
         // @ used to avoid E_STRICT for incompatible signature
         @$m = mock('DateTime');
@@ -848,8 +885,13 @@ class ContainerTest extends MockeryTestCase
         if (!class_exists('MongoCollection', false)) {
             $this->markTestSkipped('ext/mongo not installed');
         }
+        if (\PHP_MAJOR_VERSION > 7) {
+            $this->expectException('LogicException');
+        }
         Mockery::getConfiguration()->setInternalClassMethodParamMap(
-            'MongoCollection', 'insert', array('&$data', '$options')
+            'MongoCollection',
+            'insert',
+            array('&$data', '$options')
         );
         // @ used to avoid E_STRICT for incompatible signature
         @$m = mock('MongoCollection');
@@ -870,8 +912,14 @@ class ContainerTest extends MockeryTestCase
 
     public function testCanCreateNonOverridenInstanceOfPreviouslyOverridenInternalClasses()
     {
+        if (\PHP_MAJOR_VERSION > 7) {
+            $this->expectException('LogicException');
+        }
+
         Mockery::getConfiguration()->setInternalClassMethodParamMap(
-            'DateTime', 'modify', array('&$string')
+            'DateTime',
+            'modify',
+            array('&$string')
         );
         // @ used to avoid E_STRICT for incompatible signature
         @$m = mock('DateTime');
@@ -947,10 +995,34 @@ class ContainerTest extends MockeryTestCase
         $this->assertEquals(0, Mockery::getContainer()->mockery_getExpectationCount());
     }
 
-    public function testGetExpectationCount_simplestMock()
+    public function testGetExpectationCount_stub()
     {
         $m = mock();
-        $m->shouldReceive('foo')->andReturn('bar');
+        $m->shouldReceive('foo');
+        $this->assertEquals(0, Mockery::getContainer()->mockery_getExpectationCount());
+    }
+
+    public function testGetExpectationCount_mockWithOnce()
+    {
+        $m = mock();
+        $m->shouldReceive('foo')->once();
+        $this->assertEquals(1, Mockery::getContainer()->mockery_getExpectationCount());
+        $m->foo();
+    }
+
+    public function testGetExpectationCount_mockWithAtLeast()
+    {
+        $m = mock();
+        $m->shouldReceive('foo')->atLeast()->once();
+        $this->assertEquals(1, Mockery::getContainer()->mockery_getExpectationCount());
+        $m->foo();
+        $m->foo();
+    }
+
+    public function testGetExpectationCount_mockWithNever()
+    {
+        $m = mock();
+        $m->shouldReceive('foo')->never();
         $this->assertEquals(1, Mockery::getContainer()->mockery_getExpectationCount());
     }
 
@@ -1048,6 +1120,9 @@ class ContainerTest extends MockeryTestCase
         $m->foo();
     }
 
+    /**
+     * @requires PHP < 8.0
+     */
     public function testMockingIteratorAggregateDoesNotImplementIterator()
     {
         $mock = mock('MockeryTest_ImplementsIteratorAggregate');
@@ -1086,6 +1161,9 @@ class ContainerTest extends MockeryTestCase
         $this->assertInstanceOf('Traversable', $mock);
     }
 
+    /**
+     * @requires PHP < 8.0
+     */
     public function testMockingIteratorDoesNotImplementIterator()
     {
         $mock = mock('MockeryTest_ImplementsIterator');
@@ -1159,23 +1237,24 @@ class ContainerTest extends MockeryTestCase
 
     /**
      * @group issue/154
-     * @expectedException InvalidArgumentException
-     * @expectedExceptionMessage protectedMethod() cannot be mocked as it is a protected method and mocking protected methods is not enabled for the currently used mock object.
      */
     public function testShouldThrowIfAttemptingToStubProtectedMethod()
     {
         $mock = mock('MockeryTest_WithProtectedAndPrivate');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('protectedMethod() cannot be mocked as it is a protected method and mocking protected methods is not enabled for the currently used mock object.');
         $mock->shouldReceive("protectedMethod");
     }
 
     /**
      * @group issue/154
-     * @expectedException InvalidArgumentException
-     * @expectedExceptionMessage privateMethod() cannot be mocked as it is a private method
      */
     public function testShouldThrowIfAttemptingToStubPrivateMethod()
     {
         $mock = mock('MockeryTest_WithProtectedAndPrivate');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('privateMethod() cannot be mocked as it is a private method');
         $mock->shouldReceive("privateMethod");
     }
 
@@ -1197,32 +1276,26 @@ class ContainerTest extends MockeryTestCase
     /**
      * @test
      * @group issue/294
-     * @expectedException Mockery\Exception\RuntimeException
-     * @expectedExceptionMessage Could not load mock DateTime, class already exists
      */
     public function testThrowsWhenNamedMockClassExistsAndIsNotMockery()
     {
         $builder = new MockConfigurationBuilder();
         $builder->setName("DateTime");
+        $this->expectException(\Mockery\Exception\RuntimeException::class);
+        $this->expectExceptionMessage('Could not load mock DateTime, class already exists');
         $mock = mock($builder);
     }
 
-    /**
-     * @expectedException Mockery\Exception\NoMatchingExpectationException
-     * @expectedExceptionMessage MyTestClass::foo(resource(...))
-     */
     public function testHandlesMethodWithArgumentExpectationWhenCalledWithResource()
     {
         $mock = mock('MyTestClass');
         $mock->shouldReceive('foo')->with(array('yourself' => 21));
 
+        $this->expectException(\Mockery\Exception\NoMatchingExpectationException::class);
+        $this->expectExceptionMessage('MyTestClass::foo(resource(...))');
         $mock->foo(fopen('php://memory', 'r'));
     }
 
-    /**
-     * @expectedException Mockery\Exception\NoMatchingExpectationException
-     * @expectedExceptionMessage MyTestClass::foo(['myself' => [...]])
-     */
     public function testHandlesMethodWithArgumentExpectationWhenCalledWithCircularArray()
     {
         $testArray = array();
@@ -1231,13 +1304,11 @@ class ContainerTest extends MockeryTestCase
         $mock = mock('MyTestClass');
         $mock->shouldReceive('foo')->with(array('yourself' => 21));
 
+        $this->expectException(\Mockery\Exception\NoMatchingExpectationException::class);
+        $this->expectExceptionMessage("MyTestClass::foo(['myself' => [...]])");
         $mock->foo($testArray);
     }
 
-    /**
-     * @expectedException Mockery\Exception\NoMatchingExpectationException
-     * @expectedExceptionMessage MyTestClass::foo(['a_scalar' => 2, 'an_array' => [...]])
-     */
     public function testHandlesMethodWithArgumentExpectationWhenCalledWithNestedArray()
     {
         $testArray = array();
@@ -1247,13 +1318,11 @@ class ContainerTest extends MockeryTestCase
         $mock = mock('MyTestClass');
         $mock->shouldReceive('foo')->with(array('yourself' => 21));
 
+        $this->expectException(\Mockery\Exception\NoMatchingExpectationException::class);
+        $this->expectExceptionMessage("MyTestClass::foo(['a_scalar' => 2, 'an_array' => [...]])");
         $mock->foo($testArray);
     }
 
-    /**
-     * @expectedException Mockery\Exception\NoMatchingExpectationException
-     * @expectedExceptionMessage MyTestClass::foo(['a_scalar' => 2, 'an_object' => object(stdClass)])
-     */
     public function testHandlesMethodWithArgumentExpectationWhenCalledWithNestedObject()
     {
         $testArray = array();
@@ -1263,13 +1332,11 @@ class ContainerTest extends MockeryTestCase
         $mock = mock('MyTestClass');
         $mock->shouldReceive('foo')->with(array('yourself' => 21));
 
+        $this->expectException(\Mockery\Exception\NoMatchingExpectationException::class);
+        $this->expectExceptionMessage("MyTestClass::foo(['a_scalar' => 2, 'an_object' => object(stdClass)])");
         $mock->foo($testArray);
     }
 
-    /**
-     * @expectedException Mockery\Exception\NoMatchingExpectationException
-     * @expectedExceptionMessage MyTestClass::foo(['a_scalar' => 2, 'a_closure' => object(Closure
-     */
     public function testHandlesMethodWithArgumentExpectationWhenCalledWithNestedClosure()
     {
         $testArray = array();
@@ -1280,13 +1347,11 @@ class ContainerTest extends MockeryTestCase
         $mock = mock('MyTestClass');
         $mock->shouldReceive('foo')->with(array('yourself' => 21));
 
+        $this->expectException(\Mockery\Exception\NoMatchingExpectationException::class);
+        $this->expectExceptionMessage("MyTestClass::foo(['a_scalar' => 2, 'a_closure' => object(Closure");
         $mock->foo($testArray);
     }
 
-    /**
-     * @expectedException Mockery\Exception\NoMatchingExpectationException
-     * @expectedExceptionMessage MyTestClass::foo(['a_scalar' => 2, 'a_resource' => resource(...)])
-     */
     public function testHandlesMethodWithArgumentExpectationWhenCalledWithNestedResource()
     {
         $testArray = array();
@@ -1296,6 +1361,8 @@ class ContainerTest extends MockeryTestCase
         $mock = mock('MyTestClass');
         $mock->shouldReceive('foo')->with(array('yourself' => 21));
 
+        $this->expectException(\Mockery\Exception\NoMatchingExpectationException::class);
+        $this->expectExceptionMessage("MyTestClass::foo(['a_scalar' => 2, 'a_resource' => resource(...)])");
         $mock->foo($testArray);
     }
 
@@ -1325,6 +1392,7 @@ class ContainerTest extends MockeryTestCase
     /**
      * @test
      * @group issue/339
+     * @requires PHP <8.1
      */
     public function canMockClassesThatImplementSerializable()
     {
@@ -1347,11 +1415,11 @@ class ContainerTest extends MockeryTestCase
      */
     public function testIsValidClassName($expected, $className)
     {
-        $container = new \Mockery\Container;
+        $container = new \Mockery\Container();
         $this->assertSame($expected, $container->isValidClassName($className));
     }
 
-    public function classNameProvider()
+    public static function classNameProvider()
     {
         return array(
             array(false, ' '), // just a space
@@ -1441,6 +1509,7 @@ class MockeryTest_UnsetMethod
     }
 }
 
+#[\AllowDynamicProperties]
 class MockeryTestFoo
 {
     public function foo()
@@ -1449,6 +1518,7 @@ class MockeryTestFoo
     }
 }
 
+#[\AllowDynamicProperties]
 class MockeryTestFoo2
 {
     public function foo()
@@ -1700,18 +1770,16 @@ class MockeryTest_TestInheritedType
 {
 }
 
-if (PHP_VERSION_ID >= 50400) {
-    class MockeryTest_MockCallableTypeHint
+class MockeryTest_MockCallableTypeHint
+{
+    public function foo(callable $baz)
     {
-        public function foo(callable $baz)
-        {
-            $baz();
-        }
+        $baz();
+    }
 
-        public function bar(callable $callback = null)
-        {
-            $callback();
-        }
+    public function bar(?callable $callback = null)
+    {
+        $callback();
     }
 }
 
@@ -1722,34 +1790,36 @@ class MockeryTest_WithToString
     }
 }
 
-class MockeryTest_ImplementsIteratorAggregate implements IteratorAggregate
-{
-    public function getIterator()
+if (\PHP_VERSION_ID < 80000) {
+    class MockeryTest_ImplementsIteratorAggregate implements IteratorAggregate
     {
-        return new ArrayIterator(array());
-    }
-}
-
-class MockeryTest_ImplementsIterator implements Iterator
-{
-    public function rewind()
-    {
+        public function getIterator()
+        {
+            return new ArrayIterator(array());
+        }
     }
 
-    public function current()
+    class MockeryTest_ImplementsIterator implements Iterator
     {
-    }
+        public function rewind()
+        {
+        }
 
-    public function key()
-    {
-    }
+        public function current()
+        {
+        }
 
-    public function next()
-    {
-    }
+        public function key()
+        {
+        }
 
-    public function valid()
-    {
+        public function next()
+        {
+        }
+
+        public function valid()
+        {
+        }
     }
 }
 
@@ -1794,7 +1864,7 @@ class MockeryTest_PartialStatic
 
 class MockeryTest_MethodWithRequiredParamWithDefaultValue
 {
-    public function foo(DateTime $bar = null, $baz)
+    public function foo(?DateTime $bar = null, $baz)
     {
     }
 }
@@ -1813,13 +1883,15 @@ class MockeryTest_ClassThatDescendsFromInternalClass extends DateTime
 {
 }
 
-class MockeryTest_ClassThatImplementsSerializable implements Serializable
-{
-    public function serialize()
+if (PHP_VERSION_ID < 80100) {
+    class MockeryTest_ClassThatImplementsSerializable implements Serializable
     {
-    }
+        public function serialize()
+        {
+        }
 
-    public function unserialize($serialized)
-    {
+        public function unserialize($serialized)
+        {
+        }
     }
 }

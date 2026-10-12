@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,15 +11,14 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 
 /**
  * @covers Monolog\Handler\BrowserConsoleHandlerTest
  */
-class BrowserConsoleHandlerTest extends TestCase
+class BrowserConsoleHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    protected function setUp()
+    protected function setUp(): void
     {
         BrowserConsoleHandler::resetStatic();
     }
@@ -27,7 +26,6 @@ class BrowserConsoleHandlerTest extends TestCase
     protected function generateScript()
     {
         $reflMethod = new \ReflectionMethod('Monolog\Handler\BrowserConsoleHandler', 'generateScript');
-        $reflMethod->setAccessible(true);
 
         return $reflMethod->invoke(null);
     }
@@ -37,11 +35,27 @@ class BrowserConsoleHandlerTest extends TestCase
         $handler = new BrowserConsoleHandler();
         $handler->setFormatter($this->getIdentityFormatter());
 
-        $handler->handle($this->getRecord(Logger::DEBUG, 'foo[[bar]]{color: red}'));
+        $handler->handle($this->getRecord(Level::Debug, 'foo[[bar]]{color: red}'));
 
         $expected = <<<EOF
 (function (c) {if (c && c.groupCollapsed) {
-c.log("%cfoo%cbar%c", "font-weight: normal", "color: red", "font-weight: normal");
+c.debug("%cfoo%cbar%c", "font-weight: normal", "color: red", "font-weight: normal");
+}})(console);
+EOF;
+
+        $this->assertEquals($expected, $this->generateScript());
+    }
+
+    public function testStylingMultiple()
+    {
+        $handler = new BrowserConsoleHandler();
+        $handler->setFormatter($this->getIdentityFormatter());
+
+        $handler->handle($this->getRecord(Level::Debug, 'foo[[bar]]{color: red}[[baz]]{color: blue}'));
+
+        $expected = <<<EOF
+(function (c) {if (c && c.groupCollapsed) {
+c.debug("%cfoo%cbar%c%cbaz%c", "font-weight: normal", "color: red", "font-weight: normal", "color: blue", "font-weight: normal");
 }})(console);
 EOF;
 
@@ -53,11 +67,11 @@ EOF;
         $handler = new BrowserConsoleHandler();
         $handler->setFormatter($this->getIdentityFormatter());
 
-        $handler->handle($this->getRecord(Logger::DEBUG, "[foo] [[\"bar\n[baz]\"]]{color: red}"));
+        $handler->handle($this->getRecord(Level::Debug, "[foo] [[\"bar\n[baz]\"]]{color: red}"));
 
         $expected = <<<EOF
 (function (c) {if (c && c.groupCollapsed) {
-c.log("%c[foo] %c\"bar\\n[baz]\"%c", "font-weight: normal", "color: red", "font-weight: normal");
+c.debug("%c[foo] %c\"bar\\n[baz]\"%c", "font-weight: normal", "color: red", "font-weight: normal");
 }})(console);
 EOF;
 
@@ -69,15 +83,15 @@ EOF;
         $handler = new BrowserConsoleHandler();
         $handler->setFormatter($this->getIdentityFormatter());
 
-        $handler->handle($this->getRecord(Logger::DEBUG, '[[foo]]{macro: autolabel}'));
-        $handler->handle($this->getRecord(Logger::DEBUG, '[[bar]]{macro: autolabel}'));
-        $handler->handle($this->getRecord(Logger::DEBUG, '[[foo]]{macro: autolabel}'));
+        $handler->handle($this->getRecord(Level::Debug, '[[foo]]{macro: autolabel}'));
+        $handler->handle($this->getRecord(Level::Debug, '[[bar]]{macro: autolabel}'));
+        $handler->handle($this->getRecord(Level::Debug, '[[foo]]{macro: autolabel}'));
 
         $expected = <<<EOF
 (function (c) {if (c && c.groupCollapsed) {
-c.log("%c%cfoo%c", "font-weight: normal", "background-color: blue; color: white; border-radius: 3px; padding: 0 2px 0 2px", "font-weight: normal");
-c.log("%c%cbar%c", "font-weight: normal", "background-color: green; color: white; border-radius: 3px; padding: 0 2px 0 2px", "font-weight: normal");
-c.log("%c%cfoo%c", "font-weight: normal", "background-color: blue; color: white; border-radius: 3px; padding: 0 2px 0 2px", "font-weight: normal");
+c.debug("%c%cfoo%c", "font-weight: normal", "background-color: blue; color: white; border-radius: 3px; padding: 0 2px 0 2px", "font-weight: normal");
+c.debug("%c%cbar%c", "font-weight: normal", "background-color: green; color: white; border-radius: 3px; padding: 0 2px 0 2px", "font-weight: normal");
+c.debug("%c%cfoo%c", "font-weight: normal", "background-color: blue; color: white; border-radius: 3px; padding: 0 2px 0 2px", "font-weight: normal");
 }})(console);
 EOF;
 
@@ -89,13 +103,14 @@ EOF;
         $handler = new BrowserConsoleHandler();
         $handler->setFormatter($this->getIdentityFormatter());
 
-        $handler->handle($this->getRecord(Logger::DEBUG, 'test', array('foo' => 'bar')));
+        $handler->handle($this->getRecord(Level::Debug, 'test', ['foo' => 'bar', 0 => 'oop']));
 
         $expected = <<<EOF
 (function (c) {if (c && c.groupCollapsed) {
 c.groupCollapsed("%ctest", "font-weight: normal");
 c.log("%c%s", "font-weight: bold", "Context");
 c.log("%s: %o", "foo", "bar");
+c.log("%s: %o", "0", "oop");
 c.groupEnd();
 }})(console);
 EOF;
@@ -111,17 +126,17 @@ EOF;
         $handler2 = new BrowserConsoleHandler();
         $handler2->setFormatter($this->getIdentityFormatter());
 
-        $handler1->handle($this->getRecord(Logger::DEBUG, 'test1'));
-        $handler2->handle($this->getRecord(Logger::DEBUG, 'test2'));
-        $handler1->handle($this->getRecord(Logger::DEBUG, 'test3'));
-        $handler2->handle($this->getRecord(Logger::DEBUG, 'test4'));
+        $handler1->handle($this->getRecord(Level::Debug, 'test1'));
+        $handler2->handle($this->getRecord(Level::Debug, 'test2'));
+        $handler1->handle($this->getRecord(Level::Debug, 'test3'));
+        $handler2->handle($this->getRecord(Level::Debug, 'test4'));
 
         $expected = <<<EOF
 (function (c) {if (c && c.groupCollapsed) {
-c.log("%ctest1", "font-weight: normal");
-c.log("%ctest2", "font-weight: normal");
-c.log("%ctest3", "font-weight: normal");
-c.log("%ctest4", "font-weight: normal");
+c.debug("%ctest1", "font-weight: normal");
+c.debug("%ctest2", "font-weight: normal");
+c.debug("%ctest3", "font-weight: normal");
+c.debug("%ctest4", "font-weight: normal");
 }})(console);
 EOF;
 

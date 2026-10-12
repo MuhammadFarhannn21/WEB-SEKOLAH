@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,42 +11,35 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 use Monolog\Formatter\LineFormatter;
 
-class RedisHandlerTest extends TestCase
+class RedisHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    /**
-     * @expectedException InvalidArgumentException
-     */
-    public function testConstructorShouldThrowExceptionForInvalidRedis()
-    {
-        new RedisHandler(new \stdClass(), 'key');
-    }
-
     public function testConstructorShouldWorkWithPredis()
     {
-        $redis = $this->getMock('Predis\Client');
+        $redis = $this->createMock('Predis\Client');
         $this->assertInstanceof('Monolog\Handler\RedisHandler', new RedisHandler($redis, 'key'));
     }
 
     public function testConstructorShouldWorkWithRedis()
     {
-        $redis = $this->getMock('Redis');
+        if (!class_exists('Redis')) {
+            $this->markTestSkipped('The redis ext is required to run this test');
+        }
+
+        $redis = $this->createMock('Redis');
         $this->assertInstanceof('Monolog\Handler\RedisHandler', new RedisHandler($redis, 'key'));
     }
 
     public function testPredisHandle()
     {
-        $redis = $this->getMock('Predis\Client', array('rpush'));
+        $redis = $this->getMockBuilder('Predis\Client')->getMock();
+        $redis->expects($this->atLeastOnce())
+            ->method('__call')
+            ->with(self::equalTo('rpush'), self::equalTo(['key', 'test']));
 
-        // Predis\Client uses rpush
-        $redis->expects($this->once())
-            ->method('rpush')
-            ->with('key', 'test');
-
-        $record = $this->getRecord(Logger::WARNING, 'test', array('data' => new \stdClass, 'foo' => 34));
+        $record = $this->getRecord(Level::Warning, 'test', ['data' => new \stdClass, 'foo' => 34]);
 
         $handler = new RedisHandler($redis, 'key');
         $handler->setFormatter(new LineFormatter("%message%"));
@@ -55,14 +48,18 @@ class RedisHandlerTest extends TestCase
 
     public function testRedisHandle()
     {
-        $redis = $this->getMock('Redis', array('rpush'));
+        if (!class_exists('Redis')) {
+            $this->markTestSkipped('The redis ext is required to run this test');
+        }
+
+        $redis = $this->createPartialMock('Redis', ['rPush']);
 
         // Redis uses rPush
         $redis->expects($this->once())
             ->method('rPush')
             ->with('key', 'test');
 
-        $record = $this->getRecord(Logger::WARNING, 'test', array('data' => new \stdClass, 'foo' => 34));
+        $record = $this->getRecord(Level::Warning, 'test', ['data' => new \stdClass, 'foo' => 34]);
 
         $handler = new RedisHandler($redis, 'key');
         $handler->setFormatter(new LineFormatter("%message%"));
@@ -71,57 +68,73 @@ class RedisHandlerTest extends TestCase
 
     public function testRedisHandleCapped()
     {
-        $redis = $this->getMock('Redis', array('multi', 'rpush', 'ltrim', 'exec'));
+        if (!class_exists('Redis')) {
+            $this->markTestSkipped('The redis ext is required to run this test');
+        }
+
+        $redis = $this->createPartialMock('Redis', ['multi', 'rPush', 'lTrim', 'exec']);
 
         // Redis uses multi
         $redis->expects($this->once())
             ->method('multi')
-            ->will($this->returnSelf());
+            ->willReturnSelf();
 
         $redis->expects($this->once())
-            ->method('rpush')
-            ->will($this->returnSelf());
+            ->method('rPush')
+            ->willReturnSelf();
 
         $redis->expects($this->once())
-            ->method('ltrim')
-            ->will($this->returnSelf());
+            ->method('lTrim')
+            ->willReturnSelf();
 
         $redis->expects($this->once())
             ->method('exec')
-            ->will($this->returnSelf());
+            ->willReturnSelf();
 
-        $record = $this->getRecord(Logger::WARNING, 'test', array('data' => new \stdClass, 'foo' => 34));
+        $record = $this->getRecord(Level::Warning, 'test', ['data' => new \stdClass, 'foo' => 34]);
 
-        $handler = new RedisHandler($redis, 'key', Logger::DEBUG, true, 10);
+        $handler = new RedisHandler($redis, 'key', Level::Debug, true, 10);
         $handler->setFormatter(new LineFormatter("%message%"));
         $handler->handle($record);
     }
 
     public function testPredisHandleCapped()
     {
-        $redis = $this->getMock('Predis\Client', array('transaction'));
+        $redis = new class extends \Predis\Client {
+            public array $testResults = [];
 
-        $redisTransaction = $this->getMock('Predis\Client', array('rpush', 'ltrim'));
+            public function rpush(...$args)
+            {
+                $this->testResults[] = ['rpush', ...$args];
 
-        $redisTransaction->expects($this->once())
-            ->method('rpush')
-            ->will($this->returnSelf());
+                return $this;
+            }
 
-        $redisTransaction->expects($this->once())
-            ->method('ltrim')
-            ->will($this->returnSelf());
+            public function ltrim(...$args)
+            {
+                $this->testResults[] = ['ltrim', ...$args];
 
-        // Redis uses multi
-        $redis->expects($this->once())
-            ->method('transaction')
-            ->will($this->returnCallback(function ($cb) use ($redisTransaction) {
-                $cb($redisTransaction);
-            }));
+                return $this;
+            }
 
-        $record = $this->getRecord(Logger::WARNING, 'test', array('data' => new \stdClass, 'foo' => 34));
+            public function transaction(...$args)
+            {
+                $this->testResults[] = ['transaction start'];
 
-        $handler = new RedisHandler($redis, 'key', Logger::DEBUG, true, 10);
+                return ($args[0])($this);
+            }
+        };
+
+        $record = $this->getRecord(Level::Warning, 'test', ['data' => new \stdClass, 'foo' => 34]);
+
+        $handler = new RedisHandler($redis, 'key', Level::Debug, true, 10);
         $handler->setFormatter(new LineFormatter("%message%"));
         $handler->handle($record);
+
+        self::assertsame([
+            ['transaction start'],
+            ['rpush', 'key', 'test'],
+            ['ltrim', 'key', -10, -1],
+        ], $redis->testResults);
     }
 }

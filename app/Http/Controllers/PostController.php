@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
 use Auth;
 use App\Post;
 use App\Category;
@@ -37,7 +38,7 @@ class PostController extends Controller
             'status'        => 'required',
             'published_at'  => 'required'
         ]);
-        $request['slug']    = str_slug($request->get('title'), '-');
+        $request['slug']    = Str::slug($request->get('title'), '-');
         $request['user_id'] = $request->user()->id;
 
         Post::create($request->all());
@@ -62,7 +63,7 @@ class PostController extends Controller
             'status'        => 'required',
             'published_at'  => 'required'
         ]);
-        $request['slug']    = str_slug($request->get('title'), '-');
+        $request['slug']    = Str::slug($request->get('title'), '-');
 
         $post->update($request->all());
         LogAktivity::addToLog(Auth::user()->name.' Mengedit Posts Id '.$post->id);

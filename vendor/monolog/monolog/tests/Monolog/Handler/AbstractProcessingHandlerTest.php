@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,19 +11,30 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 use Monolog\Processor\WebProcessor;
+use Monolog\Formatter\LineFormatter;
 
-class AbstractProcessingHandlerTest extends TestCase
+class AbstractProcessingHandlerTest extends \Monolog\Test\MonologTestCase
 {
+    /**
+     * @covers Monolog\Handler\FormattableHandlerTrait::getFormatter
+     * @covers Monolog\Handler\FormattableHandlerTrait::setFormatter
+     */
+    public function testConstructAndGetSet()
+    {
+        $handler = $this->getMockBuilder('Monolog\Handler\AbstractProcessingHandler')->setConstructorArgs([Level::Warning, false])->onlyMethods(['write'])->getMock();
+        $handler->setFormatter($formatter = new LineFormatter);
+        $this->assertSame($formatter, $handler->getFormatter());
+    }
+
     /**
      * @covers Monolog\Handler\AbstractProcessingHandler::handle
      */
     public function testHandleLowerLevelMessage()
     {
-        $handler = $this->getMockForAbstractClass('Monolog\Handler\AbstractProcessingHandler', array(Logger::WARNING, true));
-        $this->assertFalse($handler->handle($this->getRecord(Logger::DEBUG)));
+        $handler = $this->getMockBuilder('Monolog\Handler\AbstractProcessingHandler')->setConstructorArgs([Level::Warning, true])->onlyMethods(['write'])->getMock();
+        $this->assertFalse($handler->handle($this->getRecord(Level::Debug)));
     }
 
     /**
@@ -31,7 +42,7 @@ class AbstractProcessingHandlerTest extends TestCase
      */
     public function testHandleBubbling()
     {
-        $handler = $this->getMockForAbstractClass('Monolog\Handler\AbstractProcessingHandler', array(Logger::DEBUG, true));
+        $handler = $this->getMockBuilder('Monolog\Handler\AbstractProcessingHandler')->setConstructorArgs([Level::Debug, true])->onlyMethods(['write'])->getMock();
         $this->assertFalse($handler->handle($this->getRecord()));
     }
 
@@ -40,7 +51,7 @@ class AbstractProcessingHandlerTest extends TestCase
      */
     public function testHandleNotBubbling()
     {
-        $handler = $this->getMockForAbstractClass('Monolog\Handler\AbstractProcessingHandler', array(Logger::DEBUG, false));
+        $handler = $this->getMockBuilder('Monolog\Handler\AbstractProcessingHandler')->setConstructorArgs([Level::Debug, false])->onlyMethods(['write'])->getMock();
         $this->assertTrue($handler->handle($this->getRecord()));
     }
 
@@ -49,9 +60,9 @@ class AbstractProcessingHandlerTest extends TestCase
      */
     public function testHandleIsFalseWhenNotHandled()
     {
-        $handler = $this->getMockForAbstractClass('Monolog\Handler\AbstractProcessingHandler', array(Logger::WARNING, false));
+        $handler = $this->getMockBuilder('Monolog\Handler\AbstractProcessingHandler')->setConstructorArgs([Level::Warning, false])->onlyMethods(['write'])->getMock();
         $this->assertTrue($handler->handle($this->getRecord()));
-        $this->assertFalse($handler->handle($this->getRecord(Logger::DEBUG)));
+        $this->assertFalse($handler->handle($this->getRecord(Level::Debug)));
     }
 
     /**
@@ -59,22 +70,65 @@ class AbstractProcessingHandlerTest extends TestCase
      */
     public function testProcessRecord()
     {
-        $handler = $this->getMockForAbstractClass('Monolog\Handler\AbstractProcessingHandler');
-        $handler->pushProcessor(new WebProcessor(array(
+        $handler = $this->createPartialMock('Monolog\Handler\AbstractProcessingHandler', ['write']);
+        $handler->pushProcessor(new WebProcessor([
             'REQUEST_URI' => '',
             'REQUEST_METHOD' => '',
             'REMOTE_ADDR' => '',
             'SERVER_NAME' => '',
             'UNIQUE_ID' => '',
-        )));
+        ]));
         $handledRecord = null;
         $handler->expects($this->once())
             ->method('write')
-            ->will($this->returnCallback(function ($record) use (&$handledRecord) {
+            ->willReturnCallback(function ($record) use (&$handledRecord) {
                 $handledRecord = $record;
-            }))
+            })
         ;
         $handler->handle($this->getRecord());
-        $this->assertEquals(6, count($handledRecord['extra']));
+        $this->assertEquals(6, \count($handledRecord['extra']));
+    }
+
+    /**
+     * @covers Monolog\Handler\ProcessableHandlerTrait::pushProcessor
+     * @covers Monolog\Handler\ProcessableHandlerTrait::popProcessor
+     */
+    public function testPushPopProcessor()
+    {
+        $logger = $this->createPartialMock('Monolog\Handler\AbstractProcessingHandler', ['write']);
+        $processor1 = new WebProcessor;
+        $processor2 = new WebProcessor;
+
+        $logger->pushProcessor($processor1);
+        $logger->pushProcessor($processor2);
+
+        $this->assertEquals($processor2, $logger->popProcessor());
+        $this->assertEquals($processor1, $logger->popProcessor());
+
+        $this->expectException(\LogicException::class);
+
+        $logger->popProcessor();
+    }
+
+    /**
+     * @covers Monolog\Handler\ProcessableHandlerTrait::pushProcessor
+     */
+    public function testPushProcessorWithNonCallable()
+    {
+        $handler = $this->createPartialMock('Monolog\Handler\AbstractProcessingHandler', ['write']);
+
+        $this->expectException(\TypeError::class);
+
+        $handler->pushProcessor(new \stdClass());
+    }
+
+    /**
+     * @covers Monolog\Handler\FormattableHandlerTrait::getFormatter
+     * @covers Monolog\Handler\FormattableHandlerTrait::getDefaultFormatter
+     */
+    public function testGetFormatterInitializesDefault()
+    {
+        $handler = $this->createPartialMock('Monolog\Handler\AbstractProcessingHandler', ['write']);
+        $this->assertInstanceOf(LineFormatter::class, $handler->getFormatter());
     }
 }

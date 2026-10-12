@@ -18,13 +18,15 @@
  * @license    http://github.com/padraic/mockery/blob/master/LICENSE New BSD License
  */
 
-namespace tests\Mockery\Matcher;
+namespace test\Mockery\Matcher;
 
 use Mockery\Adapter\Phpunit\MockeryTestCase;
 use Mockery\Matcher\Subset;
+use test\Mockery\RegExpCompatability;
 
 class SubsetTest extends MockeryTestCase
 {
+    use RegExpCompatability;
     /** @test */
     public function it_matches_a_shallow_subset()
     {
@@ -93,5 +95,29 @@ class SubsetTest extends MockeryTestCase
         $actual = null;
 
         $this->assertFalse($matcher->match($actual));
+    }
+
+    /** @test */
+    public function it_correctly_formats_nested_arrays_into_a_string()
+    {
+        $expected = [
+            "foo" => 123,
+            "bar" => [
+                "baz" => 456
+            ]
+        ];
+
+        $matcher = new Subset($expected);
+        $actual = $matcher->__toString();
+
+        $tests = [
+            "/foo=123/",
+            "/bar=\\[[^[\\]]+\\]/", // e.g. bar=[<anything other than square brackets>]
+            "/baz=456/"
+        ];
+
+        foreach ($tests as $pattern) {
+            self::assertMatchesRegEx($pattern, $actual);
+        }
     }
 }

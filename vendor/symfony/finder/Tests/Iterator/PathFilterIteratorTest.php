@@ -11,54 +11,53 @@
 
 namespace Symfony\Component\Finder\Tests\Iterator;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Finder\Iterator\PathFilterIterator;
 
 class PathFilterIteratorTest extends IteratorTestCase
 {
-    /**
-     * @dataProvider getTestFilterData
-     */
+    #[DataProvider('getTestFilterData')]
     public function testFilter(\Iterator $inner, array $matchPatterns, array $noMatchPatterns, array $resultArray)
     {
         $iterator = new PathFilterIterator($inner, $matchPatterns, $noMatchPatterns);
         $this->assertIterator($resultArray, $iterator);
     }
 
-    public function getTestFilterData()
+    public static function getTestFilterData()
     {
         $inner = new MockFileListIterator();
 
-        //PATH:   A/B/C/abc.dat
+        // PATH:   A/B/C/abc.dat
         $inner[] = new MockSplFileInfo([
             'name' => 'abc.dat',
             'relativePathname' => 'A'.\DIRECTORY_SEPARATOR.'B'.\DIRECTORY_SEPARATOR.'C'.\DIRECTORY_SEPARATOR.'abc.dat',
         ]);
 
-        //PATH:   A/B/ab.dat
+        // PATH:   A/B/ab.dat
         $inner[] = new MockSplFileInfo([
             'name' => 'ab.dat',
             'relativePathname' => 'A'.\DIRECTORY_SEPARATOR.'B'.\DIRECTORY_SEPARATOR.'ab.dat',
         ]);
 
-        //PATH:   A/a.dat
+        // PATH:   A/a.dat
         $inner[] = new MockSplFileInfo([
             'name' => 'a.dat',
             'relativePathname' => 'A'.\DIRECTORY_SEPARATOR.'a.dat',
         ]);
 
-        //PATH:   copy/A/B/C/abc.dat.copy
+        // PATH:   copy/A/B/C/abc.dat.copy
         $inner[] = new MockSplFileInfo([
             'name' => 'abc.dat.copy',
             'relativePathname' => 'copy'.\DIRECTORY_SEPARATOR.'A'.\DIRECTORY_SEPARATOR.'B'.\DIRECTORY_SEPARATOR.'C'.\DIRECTORY_SEPARATOR.'abc.dat',
         ]);
 
-        //PATH:   copy/A/B/ab.dat.copy
+        // PATH:   copy/A/B/ab.dat.copy
         $inner[] = new MockSplFileInfo([
             'name' => 'ab.dat.copy',
             'relativePathname' => 'copy'.\DIRECTORY_SEPARATOR.'A'.\DIRECTORY_SEPARATOR.'B'.\DIRECTORY_SEPARATOR.'ab.dat',
         ]);
 
-        //PATH:   copy/A/a.dat.copy
+        // PATH:   copy/A/a.dat.copy
         $inner[] = new MockSplFileInfo([
             'name' => 'a.dat.copy',
             'relativePathname' => 'copy'.\DIRECTORY_SEPARATOR.'A'.\DIRECTORY_SEPARATOR.'a.dat',

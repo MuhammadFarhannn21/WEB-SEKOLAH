@@ -4,7 +4,8 @@
         <meta charset="utf-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimal-ui">
-        <title>{{ \App\Aplikasi::first()->nama }}</title>
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+        <title>{{ trim($__env->yieldContent('title')) ? trim($__env->yieldContent('title')).' — ' : '' }}Panel {{ $site->nama }}</title>
         <meta content="Arman Juliansyah" name="author" />
         @yield('meta')
         <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
@@ -16,6 +17,10 @@
         <link href="{{ asset('backend/assets/css/icons.css') }}" rel="stylesheet" type="text/css">
         <link href="{{ asset('backend/assets/css/style.css') }}" rel="stylesheet" type="text/css">  
         <link href="{{ asset('backend/plugins/magnific-popup/magnific-popup.css')}}" rel="stylesheet" type="text/css">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <link href="{{ asset('backend/assets/css/modern-admin.css') }}?v=2" rel="stylesheet" type="text/css">
         <script src="{{ asset('js/currency.js')}}"></script>
 
         <style type="text/css">
@@ -67,21 +72,6 @@
               });
               $(".modal-trigger").click();
           }
-      </script>
-      <script type="text/javascript">
-          (function () {
-              var options = {
-                  whatsapp: " {{ \App\Aplikasi::first()->telepon }}", // WhatsApp number
-                  email: "{{ \App\Aplikasi::first()->email }}", // Email
-                  button_color: "#129BF4", // Color of button
-                  position: "right", // Position may be 'right' or 'left'
-                  order: "whatsapp,email", // Order of buttons
-              };
-              var proto = document.location.protocol, host = "whatshelp.io", url = proto + "//static." + host;
-              var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = url + '/widget-send-button/js/init.js';
-              s.onload = function () { WhWidgetSendButton.init(host, proto, options); };
-              var x = document.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x);
-          })();
       </script>
       @yield('assets-footer')
       <script src="{{ asset('backend/assets/js/app.js')}}"></script>

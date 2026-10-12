@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,40 +11,67 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
+use Monolog\Formatter\LineFormatter;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * @covers Monolog\Handler\PsrHandler::handle
  */
-class PsrHandlerTest extends TestCase
+class PsrHandlerTest extends \Monolog\Test\MonologTestCase
 {
-    public function logLevelProvider()
+    public static function logLevelProvider()
     {
-        $levels = array();
-        $monologLogger = new Logger('');
-
-        foreach ($monologLogger->getLevels() as $levelName => $level) {
-            $levels[] = array($levelName, $level);
-        }
-
-        return $levels;
+        return array_map(
+            fn (Level $level) => [$level->toPsrLogLevel(), $level],
+            Level::cases()
+        );
     }
 
-    /**
-     * @dataProvider logLevelProvider
-     */
-    public function testHandlesAllLevels($levelName, $level)
+    #[DataProvider('logLevelProvider')]
+    public function testHandlesAllLevels(string $levelName, Level $level)
     {
-        $message = 'Hello, world! ' . $level;
-        $context = array('foo' => 'bar', 'level' => $level);
+        $message = 'Hello, world! ' . $level->value;
+        $context = ['foo' => 'bar', 'level' => $level->value];
 
-        $psrLogger = $this->getMock('Psr\Log\NullLogger');
+        $psrLogger = $this->createMock('Psr\Log\NullLogger');
         $psrLogger->expects($this->once())
             ->method('log')
-            ->with(strtolower($levelName), $message, $context);
+            ->with($levelName, $message, $context);
 
         $handler = new PsrHandler($psrLogger);
-        $handler->handle(array('level' => $level, 'level_name' => $levelName, 'message' => $message, 'context' => $context));
+        $handler->handle($this->getRecord($level, $message, context: $context));
+    }
+
+    public function testFormatter()
+    {
+        $message = 'Hello, world!';
+        $context = ['foo' => 'bar'];
+        $level = Level::Error;
+
+        $psrLogger = $this->createMock('Psr\Log\NullLogger');
+        $psrLogger->expects($this->once())
+            ->method('log')
+            ->with($level->toPsrLogLevel(), 'dummy', $context);
+
+        $handler = new PsrHandler($psrLogger);
+        $handler->setFormatter(new LineFormatter('dummy'));
+        $handler->handle($this->getRecord($level, $message, context: $context, datetime: new \DateTimeImmutable()));
+    }
+
+    public function testIncludeExtra()
+    {
+        $message = 'Hello, world!';
+        $context = ['foo' => 'bar'];
+        $extra = ['baz' => 'boo'];
+        $level = Level::Error;
+
+        $psrLogger = $this->createMock('Psr\Log\NullLogger');
+        $psrLogger->expects($this->once())
+            ->method('log')
+            ->with($level->toPsrLogLevel(), $message, ['baz' => 'boo', 'foo' => 'bar']);
+
+        $handler = new PsrHandler($psrLogger, includeExtra: true);
+        $handler->handle($this->getRecord($level, $message, context: $context, datetime: new \DateTimeImmutable(), extra: $extra));
     }
 }

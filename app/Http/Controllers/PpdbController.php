@@ -11,7 +11,7 @@ class PpdbController extends Controller
 {
 	public function index()
 	{
-		return view('backend.register');
+    return view('frontend.ppdb');
 	}
 
 	public function store(Request $request)

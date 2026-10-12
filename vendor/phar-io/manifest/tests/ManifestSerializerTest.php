@@ -1,8 +1,20 @@
-<?php
-
+<?php declare(strict_types = 1);
+/*
+ * This file is part of PharIo\Manifest.
+ *
+ * Copyright (c) Arne Blankerts <arne@blankerts.de>, Sebastian Heuer <sebastian@phpeople.de>, Sebastian Bergmann <sebastian@phpunit.de> and contributors
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ *
+ */
 namespace PharIo\Manifest;
 
 use PharIo\Version\Version;
+use function file_get_contents;
+use function sys_get_temp_dir;
+use function uniqid;
+use function unlink;
 
 /**
  * @covers \PharIo\Manifest\ManifestSerializer
@@ -48,14 +60,12 @@ class ManifestSerializerTest extends \PHPUnit\Framework\TestCase {
     /**
      * @dataProvider dataProvider
      *
-     * @param $expected
-     *
      * @uses \PharIo\Manifest\Application
      * @uses \PharIo\Manifest\Library
      * @uses \PharIo\Manifest\Extension
      * @uses \PharIo\Manifest\ExtensionElement
      */
-    public function testCanSerializeToString($expected) {
+    public function testCanSerializeToString($expected): void {
         $manifest = ManifestLoader::fromString($expected);
 
         $serializer = new ManifestSerializer();
@@ -78,9 +88,9 @@ class ManifestSerializerTest extends \PHPUnit\Framework\TestCase {
      * @uses \PharIo\Manifest\Library
      * @uses \PharIo\Manifest\ApplicationName
      */
-    public function testCanSerializeToFile() {
+    public function testCanSerializeToFile(): void {
         $src        = __DIR__ . '/_fixture/library.xml';
-        $dest       = '/tmp/' . uniqid('serializer', true);
+        $dest       = sys_get_temp_dir() . '/' . uniqid('serializer', true);
         $manifest   = ManifestLoader::fromFile($src);
         $serializer = new ManifestSerializer();
         $serializer->serializeToFile($manifest, $dest);
@@ -91,7 +101,7 @@ class ManifestSerializerTest extends \PHPUnit\Framework\TestCase {
     /**
      * @uses \PharIo\Manifest\ApplicationName
      */
-    public function testCanHandleUnknownType() {
+    public function testCanHandleUnknownType(): void {
         $type     = $this->getMockForAbstractClass(Type::class);
         $manifest = new Manifest(
             new ApplicationName('testvendor/testname'),

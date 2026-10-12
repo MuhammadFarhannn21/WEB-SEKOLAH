@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /*
  * This file is part of PHPUnit.
  *
@@ -7,22 +7,16 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+namespace PHPUnit\TestFixture;
 
-class BankAccountException extends RuntimeException
-{
-}
-
-/**
- * A bank account.
- */
-class BankAccount
+final class BankAccount
 {
     /**
      * The bank account's balance.
      *
      * @var float
      */
-    protected $balance = 0;
+    private $balance = 0;
 
     /**
      * Returns the bank account's balance.
@@ -69,7 +63,7 @@ class BankAccount
      *
      * @throws BankAccountException
      */
-    protected function setBalance($balance): void
+    private function setBalance($balance): void
     {
         if ($balance >= 0) {
             $this->balance = $balance;

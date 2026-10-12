@@ -14,6 +14,7 @@ namespace Symfony\Component\Translation\Tests;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Translation\DataCollectorTranslator;
 use Symfony\Component\Translation\Loader\ArrayLoader;
+use Symfony\Component\Translation\TranslatableMessage;
 use Symfony\Component\Translation\Translator;
 
 class DataCollectorTranslatorTest extends TestCase
@@ -34,6 +35,7 @@ class DataCollectorTranslatorTest extends TestCase
             'id' => 'foo',
             'translation' => 'foo (en)',
             'locale' => 'en',
+            'fallbackLocale' => null,
             'domain' => 'messages',
             'state' => DataCollectorTranslator::MESSAGE_DEFINED,
             'parameters' => [],
@@ -42,7 +44,8 @@ class DataCollectorTranslatorTest extends TestCase
         $expectedMessages[] = [
             'id' => 'bar',
             'translation' => 'bar (fr)',
-            'locale' => 'fr',
+            'locale' => 'en',
+            'fallbackLocale' => 'fr',
             'domain' => 'messages',
             'state' => DataCollectorTranslator::MESSAGE_EQUALS_FALLBACK,
             'parameters' => [],
@@ -52,6 +55,7 @@ class DataCollectorTranslatorTest extends TestCase
             'id' => 'choice',
             'translation' => 'choice',
             'locale' => 'en',
+            'fallbackLocale' => null,
             'domain' => 'messages',
             'state' => DataCollectorTranslator::MESSAGE_MISSING,
             'parameters' => ['%count%' => 0],
@@ -60,7 +64,8 @@ class DataCollectorTranslatorTest extends TestCase
         $expectedMessages[] = [
             'id' => 'bar_ru',
             'translation' => 'bar (ru)',
-            'locale' => 'ru',
+            'locale' => 'en',
+            'fallbackLocale' => 'ru',
             'domain' => 'messages',
             'state' => DataCollectorTranslator::MESSAGE_EQUALS_FALLBACK,
             'parameters' => [],
@@ -69,7 +74,8 @@ class DataCollectorTranslatorTest extends TestCase
         $expectedMessages[] = [
             'id' => 'bar_ru',
             'translation' => 'bar (ru)',
-            'locale' => 'ru',
+            'locale' => 'en',
+            'fallbackLocale' => 'ru',
             'domain' => 'messages',
             'state' => DataCollectorTranslator::MESSAGE_EQUALS_FALLBACK,
             'parameters' => ['foo' => 'bar'],
@@ -79,28 +85,16 @@ class DataCollectorTranslatorTest extends TestCase
         $this->assertEquals($expectedMessages, $collector->getCollectedMessages());
     }
 
-    /**
-     * @group legacy
-     */
-    public function testCollectMessagesTransChoice()
+    public function testGetGlobalParameters()
     {
-        $collector = $this->createCollector();
-        $collector->setFallbackLocales(['fr', 'ru']);
-        $collector->transChoice('choice', 0);
+        $translatable = new TranslatableMessage('url.front');
 
-        $expectedMessages = [];
+        $translator = new Translator('en');
+        $translator->addGlobalParameter('app', 'My app');
+        $translator->addGlobalParameter('url', $translatable);
+        $collector = new DataCollectorTranslator($translator);
 
-        $expectedMessages[] = [
-              'id' => 'choice',
-              'translation' => 'choice',
-              'locale' => 'en',
-              'domain' => 'messages',
-              'state' => DataCollectorTranslator::MESSAGE_MISSING,
-              'parameters' => ['%count%' => 0],
-              'transChoiceNumber' => 0,
-        ];
-
-        $this->assertEquals($expectedMessages, $collector->getCollectedMessages());
+        $this->assertEquals(['app' => 'My app', 'url' => $translatable], $collector->getGlobalParameters());
     }
 
     private function createCollector()

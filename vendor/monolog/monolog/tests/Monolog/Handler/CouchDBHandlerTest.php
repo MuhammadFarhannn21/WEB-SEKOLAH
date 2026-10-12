@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of the Monolog package.
@@ -11,14 +11,13 @@
 
 namespace Monolog\Handler;
 
-use Monolog\TestCase;
-use Monolog\Logger;
+use Monolog\Level;
 
-class CouchDBHandlerTest extends TestCase
+class CouchDBHandlerTest extends \Monolog\Test\MonologTestCase
 {
     public function testHandle()
     {
-        $record = $this->getRecord(Logger::WARNING, 'test', array('data' => new \stdClass, 'foo' => 34));
+        $record = $this->getRecord(Level::Warning, 'test', ['data' => new \stdClass, 'foo' => 34]);
 
         $handler = new CouchDBHandler();
 
