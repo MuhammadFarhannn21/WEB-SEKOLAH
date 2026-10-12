@@ -43,7 +43,7 @@
 					</div>
 					<div class="detail-content">
 						<div class="blog-info">
-							<a href="#"><i class="fa fa-user"></i>By: {{$post->user->name}}</a>
+							<a href="#"><i class="fa fa-user"></i>By: {{ $post->user->name ?? 'Admin' }}</a>
 							<a href="#"><i class="fa fa-calendar"></i><?php $tanggal=date_create($post->published_at); ?> 
 								{{ date_format($tanggal,"d M Y")}}
 							<a href="#"><i class="fa fa-archive"></i>{{$post->category->title}}</a>

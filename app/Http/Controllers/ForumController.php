@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
 use Auth;
 use App\Post;
 use App\Category;
@@ -38,7 +39,7 @@ class ForumController extends Controller
             'status'        => 'required',
             'published_at'  => 'required'
         ]);
-        $request['slug']    = str_slug($request->get('title'), '-');
+        $request['slug']    = Str::slug($request->get('title'), '-');
         $request['user_id'] = $request->user()->id;
         $request['jenis'] = "forum";
 
@@ -64,7 +65,7 @@ class ForumController extends Controller
             'status'        => 'required',
             'published_at'  => 'required'
         ]);
-        $request['slug']    = str_slug($request->get('title'), '-');
+        $request['slug']    = Str::slug($request->get('title'), '-');
 
         $post->update($request->all());
         LogAktivity::addToLog(Auth::user()->name.' Mengedit Forum Id '.$post->id);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
 use App\Category;
 use Auth;
 use Illuminate\Http\Request;
@@ -40,7 +41,7 @@ class KategoriController extends Controller
             }else{
                 Category::create([
                     'title'         => $nama1,
-                    'slug'          => str_slug($nama1, '-')
+                    'slug'          => Str::slug($nama1, '-')
                     
                 ]);
                 LogAktivity::addToLog(Auth::user()->name.' Membuat Kategori '.$nama1);
@@ -64,7 +65,7 @@ class KategoriController extends Controller
         $this->validate($request, [
             'title'         => 'required|string|min:3|unique:categories,title,' . $id
         ]);
-        $request['slug']    = str_slug($request->get('title'), '-');
+        $request['slug']    = Str::slug($request->get('title'), '-');
 
         $user = Category::findOrFail($id);        
         $user->update($request->all());
