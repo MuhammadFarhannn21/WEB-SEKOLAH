@@ -378,7 +378,6 @@ body.drawer-open { overflow: hidden; }
     .m-burger { display: inline-flex; }
     .m-topbar .m-hide-sm { display: none; }
     .m-stats { grid-template-columns: repeat(2, 1fr); }
-    .m-stats > :last-child:nth-child(odd) { grid-column: span 2; }
     .m-track { grid-auto-columns: calc((100% - 24px) / 2); }
     .m-section { padding: 68px 0; }
     .m-cta { padding: 40px 30px; }
@@ -581,7 +580,6 @@ html, body { overflow-x: clip; }
 }
 @media (max-width: 767px) {
     .m-stats { grid-template-columns: repeat(2, 1fr); }
-    .m-stats > :last-child:nth-child(odd) { grid-column: span 2; }
     .m-program-panel.active { grid-template-columns: 1fr; }
     .m-program-art { min-height: 220px; padding: 28px; }
     .m-program-art img { max-width: 150px; }
