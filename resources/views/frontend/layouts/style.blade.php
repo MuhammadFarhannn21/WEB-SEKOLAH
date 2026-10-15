@@ -163,4 +163,4 @@ footer,
 }
 /* ===== END FULLSCREEN FIX ===== */
 </style>
-<link rel="stylesheet" href="{{ asset('frontend/css/modern.css') }}?v=3">
+<link rel="stylesheet" href="{{ asset('frontend/css/modern.css') }}?v=4">

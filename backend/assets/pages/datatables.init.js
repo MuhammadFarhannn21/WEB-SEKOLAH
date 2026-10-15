@@ -13,6 +13,7 @@ $(document).ready(function() {
         buttons: ['excel', 'pdf', 'colvis']
     });
 
-    table.buttons().container()
+    // plugin Buttons tidak dimuat di semua halaman
+    if (table.buttons) table.buttons().container()
         .appendTo('#datatable-buttons_wrapper .col-md-6:eq(0)');
 } );

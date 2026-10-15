@@ -6,6 +6,7 @@
 	</head>
 	<body>
 		<a href="#main" class="sr-only sr-only-focusable">Lewati ke konten</a>
+		<div class="m-progress" aria-hidden="true"><span></span></div>
 		@include('frontend.layouts.preloader')
 		@include('frontend.layouts.header')
 		<main id="main">

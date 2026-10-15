@@ -311,3 +311,49 @@ div.dataTables_wrapper div.dataTables_processing { background: var(--a-navy) !im
 /* Cegah margin-collapse agar hero tidak menempel ke topbar */
 .content-page .content { display: flow-root; }
 #sidebar-menu li { list-style: none; }
+
+/* =========================================================
+   Tambahan v3: judul kartu form & area upload foto
+   ========================================================= */
+/* Judul kartu bertema lama (text-white bg-primary) jadi tak terlihat di atas latar putih */
+.card-header.text-white, .card-header.bg-primary { color: var(--a-navy) !important; font-weight: 700; font-size: 14.5px; }
+.card-header.bg-primary { box-shadow: inset 3px 0 0 var(--a-primary); }
+
+/* Area seret & lepas foto */
+.a-drop {
+    position: relative; margin-top: 12px; border: 2px dashed #cdd5e6; border-radius: var(--a-radius); background: #fafbfe;
+    min-height: 150px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden;
+    transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.a-drop:hover, .a-drop:focus { border-color: var(--a-primary); background: var(--a-primary-soft); outline: none; }
+.a-drop.is-over { border-color: var(--a-primary); background: var(--a-primary-soft); box-shadow: 0 0 0 4px rgba(26, 115, 232, .15); }
+.a-drop > img { display: block; max-width: 100%; max-height: 240px; margin: 14px auto; border-radius: 10px; object-fit: contain; }
+.a-drop-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 22px 16px; color: var(--a-muted); pointer-events: none; }
+.a-drop-empty i { font-size: 38px; line-height: 1; color: var(--a-primary); margin-bottom: 4px; }
+.a-drop-empty strong { color: var(--a-navy); font-size: 14px; }
+.a-drop-empty span { font-size: 12.5px; }
+.a-drop-empty small { font-size: 11.5px; opacity: .8; }
+.a-drop.has-image .a-drop-empty { display: none; }
+.a-drop.has-image.is-broken > img { display: none !important; }
+.a-drop.has-image.is-broken .a-drop-empty { display: flex; }
+.a-drop-actions { position: absolute; top: 10px; right: 10px; display: none; gap: 6px; }
+.a-drop.has-image .a-drop-actions { display: flex; }
+.a-drop-actions button {
+    border: 0; border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    background: rgba(255, 255, 255, .95); color: var(--a-navy); box-shadow: var(--a-shadow);
+}
+.a-drop-actions .a-drop-remove { color: var(--a-danger); }
+.a-drop-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(26, 115, 232, .12); opacity: 0; transition: opacity .2s; }
+.a-drop-bar span { display: block; height: 100%; width: 0; background: var(--a-primary); transition: width .2s; }
+.a-drop.is-uploading { pointer-events: none; }
+.a-drop.is-uploading .a-drop-bar { opacity: 1; }
+.a-drop.is-uploading::after {
+    content: 'Mengunggah...'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, .75); font-weight: 700; color: var(--a-navy);
+}
+
+/* Thumbnail tabel yang filenya tidak ditemukan */
+img.a-img-missing {
+    background: #eef1f7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a3adc2'%3E%3Cpath d='M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E") center / 55% no-repeat;
+    border-radius: 8px; min-width: 40px; min-height: 40px; object-fit: cover;
+}

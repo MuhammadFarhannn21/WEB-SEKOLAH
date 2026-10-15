@@ -2,6 +2,8 @@
 @section('konten')
     @include('frontend.layouts.slider')
     @include('frontend.layouts.quick')
+    @include('frontend.layouts.sambutan')
+    @include('frontend.layouts.jurusan')
     @include('frontend.layouts.berita')
     @include('frontend.layouts.jumlahsiswa')
     @include('frontend.layouts.fasilitas')
@@ -9,6 +11,7 @@
     @include('frontend.layouts.video')
     @include('frontend.layouts.staff')
     @include('frontend.layouts.gallery')
+    @include('frontend.layouts.mitra')
     @include('frontend.layouts.slide')
     @include('frontend.layouts.cta')
 @endsection

@@ -1,27 +1,49 @@
-<section class="our-features section">
+@php
+	$jurusan_list = \App\Jurusan::orderBy('id')->get();
+	$warna = ['#1a73e8', '#12a37f', '#7c3aed', '#e8590c', '#d6336c', '#0ea5e9'];
+@endphp
+
+@if($jurusan_list->count())
+<section class="m-section m-section-soft" id="program-keahlian">
 	<div class="container">
-		<div class="row">
-			<div class="col-12 wow zoomIn">
-				<div class="section-title">
-					<h2>{!! \App\Aplikasi::first()->judul_jurusan !!}</h2>
-					<p>{!! \App\Aplikasi::first()->judul_sub_jurusan !!}</p>
-				</div>
+		<div class="m-head reveal">
+			<div>
+				<span class="m-eyebrow"><i class="fa fa-graduation-cap"></i> Program Keahlian</span>
+				<h2 class="m-title">{{ $site->judul_jurusan ?: 'Kompetensi Keahlian' }}</h2>
+				<p class="m-sub">Pilih jurusan yang sesuai dengan minat dan bakatmu. Klik untuk melihat penjelasannya.</p>
 			</div>
+			<a href="{{ url('/jurusan') }}" class="m-btn m-btn-outline">Semua Jurusan <i class="fa fa-arrow-right"></i></a>
 		</div>
-		<div class="row justify-content-center">
-			@foreach(\App\Jurusan::all() as $jurusan)
-			<div class="col-lg-4 col-md-4 col-12 wow fadeInUp">
-				<!-- Single Feature -->
-				<div class="single-feature">
-					<div class="feature-head">
-						<a href="#"><img style="width: 100%;height: 250px;background-image: url({{ asset($jurusan->gambar)}});background-size: cover;background-position: center center"></a>
-					</div>
-					<h2><a href="#">{{$jurusan->judul}}</a></h2>
-					<p>{{$jurusan->sub_judul}}</p>	
-				</div>
-				<!--/ End Single Feature -->
+
+		<div class="m-program reveal" data-tabs>
+			<div class="m-program-list" role="tablist">
+				@foreach($jurusan_list as $i => $j)
+				<button type="button" role="tab" class="{{ $i === 0 ? 'active' : '' }}" data-tab="jurusan-{{ $j->id }}" style="--c: {{ $warna[$i % count($warna)] }}">
+					<span class="logo">
+						<img src="{{ asset($j->gambar) }}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa fa-graduation-cap'}))">
+					</span>
+					<span class="name">{{ $j->judul }}</span>
+					<i class="fa fa-angle-right arrow"></i>
+				</button>
+				@endforeach
 			</div>
-			@endforeach
+
+			<div class="m-program-panels">
+				@foreach($jurusan_list as $i => $j)
+				<article class="m-tab-panel m-program-panel {{ $i === 0 ? 'active' : '' }}" role="tabpanel" data-panel="jurusan-{{ $j->id }}" style="--c: {{ $warna[$i % count($warna)] }}">
+					<div class="m-program-art">
+						<img src="{{ asset($j->gambar) }}" alt="{{ $j->judul }}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa fa-graduation-cap m-program-fallback'}))">
+					</div>
+					<div class="m-program-text">
+						<span class="m-program-num">{{ str_pad($i + 1, 2, '0', STR_PAD_LEFT) }} / {{ str_pad($jurusan_list->count(), 2, '0', STR_PAD_LEFT) }}</span>
+						<h3>{{ $j->judul }}</h3>
+						<p>{{ \Illuminate\Support\Str::limit(strip_tags($j->sub_judul), 320) }}</p>
+						<a href="{{ url('jurusan/'.$j->id) }}" class="m-btn m-btn-primary">Pelajari Jurusan <i class="fa fa-arrow-right"></i></a>
+					</div>
+				</article>
+				@endforeach
+			</div>
 		</div>
 	</div>
 </section>
+@endif
