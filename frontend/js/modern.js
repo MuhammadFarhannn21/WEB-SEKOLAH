@@ -192,3 +192,85 @@
         });
     });
 })();
+
+/* =========================================================
+   Tambahan v5: interaksi halaman dalam
+   ========================================================= */
+(function () {
+    'use strict';
+
+    /* Salin tautan artikel */
+    document.querySelectorAll('[data-copy]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var text = btn.getAttribute('data-copy');
+            var done = function () {
+                var label = btn.querySelector('em');
+                var old = label ? label.textContent : '';
+                btn.classList.add('copied');
+                if (label) label.textContent = 'Tautan disalin!';
+                setTimeout(function () { btn.classList.remove('copied'); if (label) label.textContent = old; }, 2000);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(done);
+            } else {
+                var t = document.createElement('textarea');
+                t.value = text; document.body.appendChild(t); t.select();
+                try { document.execCommand('copy'); done(); } catch (e) { /* abaikan */ }
+                document.body.removeChild(t);
+            }
+        });
+    });
+
+    /* Filter cepat kartu: input[data-filter="#id-grid"] menyaring [data-filter-text] */
+    document.querySelectorAll('input[data-filter]').forEach(function (input) {
+        var grid = document.querySelector(input.getAttribute('data-filter'));
+        if (!grid) return;
+        var empty = grid.parentElement.querySelector('.m-filter-empty');
+        input.addEventListener('input', function () {
+            var q = input.value.trim().toLowerCase();
+            var shown = 0;
+            grid.querySelectorAll('[data-filter-text]').forEach(function (el) {
+                var hit = !q || el.getAttribute('data-filter-text').indexOf(q) !== -1;
+                el.classList.toggle('is-hidden', !hit);
+                if (hit) { shown++; el.classList.add('in'); }
+            });
+            if (empty) empty.hidden = shown > 0;
+        });
+    });
+
+    /* Checklist persyaratan PPDB */
+    document.querySelectorAll('[data-checklist]').forEach(function (list) {
+        var boxes = list.querySelectorAll('input[type=checkbox]');
+        var bar = list.querySelector('.m-check-progress > span');
+        var count = list.querySelector('[data-checked]');
+        function update() {
+            var n = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+            if (count) count.textContent = n;
+            if (bar) bar.style.setProperty('--p', (boxes.length ? n / boxes.length * 100 : 0) + '%');
+        }
+        boxes.forEach(function (b) { b.addEventListener('change', update); });
+        update();
+    });
+
+    /* Kartu struktur organisasi: ketuk untuk melihat detail (layar sentuh) */
+    document.querySelectorAll('.m-person').forEach(function (card) {
+        card.addEventListener('click', function () {
+            var open = !card.classList.contains('open');
+            document.querySelectorAll('.m-person.open').forEach(function (c) { c.classList.remove('open'); });
+            card.classList.toggle('open', open);
+        });
+    });
+
+    /* Pratinjau foto sebelum dikirim (buku tamu) */
+    document.querySelectorAll('.m-photo-pick input[type=file]').forEach(function (input) {
+        var wrap = input.closest('.m-photo-pick');
+        var img = wrap.querySelector('img');
+        input.addEventListener('change', function () {
+            var file = input.files && input.files[0];
+            if (!file || !img) return;
+            img.src = URL.createObjectURL(file);
+            img.hidden = false;
+            wrap.classList.add('has-photo');
+        });
+    });
+})();

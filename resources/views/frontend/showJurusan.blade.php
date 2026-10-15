@@ -1,160 +1,94 @@
 @extends('frontend.layouts.master')
-
-@section('konten')
+@section('title', $jurusan->judul)
 
 @php
-$warna = ['#1a73e8','#0F6E56','#3C3489','#854F0B','#993556'];
-$w = $warna[($jurusan->id - 1) % count($warna)];
+	$warna = ['#1a73e8', '#12a37f', '#7c3aed', '#e8590c', '#d6336c', '#0ea5e9'];
+	$semua = \App\Jurusan::orderBy('id')->get();
+	$posisi = max(0, $semua->search(fn ($j) => $j->id === $jurusan->id));
+	$w = $warna[$posisi % count($warna)];
+	$tambahan = trim(html_entity_decode(strip_tags($jurusan->keterangan ?? '')));
+	$keunggulan = [
+		['fa-users', 'Tenaga pengajar berpengalaman & bersertifikat'],
+		['fa-building', 'Fasilitas praktik modern & lengkap'],
+		['fa-handshake-o', 'Kerja sama dengan dunia usaha & industri'],
+		['fa-certificate', 'Sertifikasi kompetensi nasional'],
+		['fa-briefcase', 'Peluang kerja & karier yang luas'],
+		['fa-graduation-cap', 'Siap melanjutkan ke perguruan tinggi'],
+	];
+	$wa = $site->telepon ? 'https://wa.me/'.preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $site->telepon)) : null;
 @endphp
 
-{{-- Hero --}}
-<section style="position:relative; min-height:400px; background:linear-gradient(135deg, #1a2e5a 0%, {{ $w }} 100%); overflow:hidden;">
-    @if($jurusan->gambar)
-    <div style="position:absolute; inset:0; background-image:url('{{ asset($jurusan->gambar) }}'); background-size:cover; background-position:center; opacity:0.2;"></div>
-    @endif
-    <div style="position:absolute; inset:0; background:linear-gradient(135deg, rgba(26,46,90,0.9) 0%, rgba(26,46,90,0.6) 100%);"></div>
-    <div class="container" style="position:relative; z-index:1; padding:80px 0 60px;">
-        <div class="row align-items-center">
-            <div class="col-lg-8 col-12">
-                <div style="display:inline-block; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:20px; padding:6px 16px; margin-bottom:20px;">
-                    <span style="color:#f0c040; font-size:12px; font-weight:700; letter-spacing:1px;">KOMPETENSI KEAHLIAN</span>
-                </div>
-                <h1 style="color:#fff; font-size:36px; font-weight:700; line-height:1.3; margin-bottom:16px;">{{ $jurusan->judul }}</h1>
-                <p style="color:rgba(255,255,255,0.8); font-size:15px; line-height:1.8; margin-bottom:28px;">
-                    {{ substr(strip_tags($jurusan->sub_judul), 0, 200) }}...
-                </p>
-                <ul style="list-style:none; padding:0; margin:0; display:flex; align-items:center; gap:8px;">
-                    <li><a href="{{ url('/') }}" style="color:rgba(255,255,255,0.7); text-decoration:none; font-size:14px;">Home</a></li>
-                    <li style="color:rgba(255,255,255,0.4);"><i class="fa fa-angle-right"></i></li>
-                    <li><a href="{{ url('/jurusan') }}" style="color:rgba(255,255,255,0.7); text-decoration:none; font-size:14px;">Jurusan</a></li>
-                    <li style="color:rgba(255,255,255,0.4);"><i class="fa fa-angle-right"></i></li>
-                    <li style="color:#fff; font-size:14px;">{{ substr($jurusan->judul, 0, 25) }}...</li>
-                </ul>
-            </div>
-            <div class="col-lg-4 col-12 mt-4 mt-lg-0">
-                @if($jurusan->gambar)
-                <div style="border-radius:16px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.3); border:3px solid rgba(255,255,255,0.2);">
-                    <img src="{{ asset($jurusan->gambar) }}" style="width:100%; height:280px; object-fit:cover;">
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
+@section('konten')
+@include('frontend.partials.page-hero', [
+	'title' => $jurusan->judul,
+	'eyebrow' => 'Program Keahlian '.str_pad($posisi + 1, 2, '0', STR_PAD_LEFT).' / '.str_pad($semua->count(), 2, '0', STR_PAD_LEFT),
+	'icon' => 'fa-graduation-cap',
+	'subtitle' => \Illuminate\Support\Str::limit(strip_tags($jurusan->sub_judul), 180),
+	'crumbs' => ['Jurusan' => url('/jurusan'), $jurusan->judul => null],
+	'aside' => '<div class="m-major-badge" style="--c: '.$w.'"><img src="'.e(asset($jurusan->gambar)).'" alt="" onerror="this.replaceWith(Object.assign(document.createElement(\'i\'),{className:\'fa fa-graduation-cap\'}))"></div>',
+])
+
+<section class="m-section m-section-soft m-page-body" style="--c: {{ $w }}">
+	<div class="container">
+		<div class="row">
+			<div class="col-lg-8 col-12">
+				<article class="m-article">
+					<h3 class="m-block-title"><i class="fa fa-info-circle"></i> Tentang Jurusan</h3>
+					<div class="m-prose">
+						<p>{{ strip_tags($jurusan->sub_judul) }}</p>
+						@if(mb_strlen($tambahan) > 60)
+							{!! $jurusan->keterangan !!}
+						@endif
+					</div>
+				</article>
+
+				<div class="m-article">
+					<h3 class="m-block-title"><i class="fa fa-star-o"></i> Mengapa Memilih Jurusan Ini?</h3>
+					<div class="m-features">
+						@foreach($keunggulan as $i => [$ikon, $teks])
+						<div class="m-feature-item reveal reveal-d{{ $i % 2 + 1 }}">
+							<span><i class="fa {{ $ikon }}"></i></span>
+							<p>{{ $teks }}</p>
+						</div>
+						@endforeach
+					</div>
+				</div>
+			</div>
+
+			<aside class="col-lg-4 col-12 mt-5 mt-lg-0">
+				<div class="m-sidebar">
+					<div class="m-widget m-widget-cta" style="background: linear-gradient(140deg, var(--navy), {{ $w }});">
+						<i class="fa fa-pencil-square-o"></i>
+						<h5>Tertarik bergabung?</h5>
+						<p>Daftarkan diri sekarang dan raih masa depan cerah bersama kami.</p>
+						<a href="{{ url('/ppdb') }}" class="m-btn m-btn-accent m-btn-sm">Daftar Sekarang <i class="fa fa-arrow-right"></i></a>
+						@if($wa)
+						<a href="{{ $wa }}" target="_blank" rel="noopener" class="m-btn m-btn-ghost m-btn-sm" style="margin-top:10px;"><i class="fa fa-whatsapp"></i> Tanya via WhatsApp</a>
+						@endif
+					</div>
+
+					<div class="m-widget">
+						<h5><i class="fa fa-info"></i> Info Jurusan</h5>
+						<ul class="m-info-list">
+							<li><i class="fa fa-clock-o"></i><span><small>Durasi Pendidikan</small>3 Tahun</span></li>
+							@if($site->alamat)<li><i class="fa fa-map-marker"></i><span><small>Lokasi</small>{{ $site->alamat }}</span></li>@endif
+							@if($site->telepon)<li><i class="fa fa-phone"></i><span><small>Kontak</small>{{ $site->telepon }}</span></li>@endif
+						</ul>
+					</div>
+
+					<div class="m-widget">
+						<h5><i class="fa fa-th-large"></i> Jurusan Lainnya</h5>
+						@foreach($semua as $i => $l)
+							@continue($l->id === $jurusan->id)
+							<a href="{{ url('jurusan/'.$l->id) }}" class="m-mini-post" style="--c: {{ $warna[$i % count($warna)] }}">
+								<span class="thumb m-thumb-logo"><img src="{{ asset($l->gambar) }}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fa fa-graduation-cap'}))"></span>
+								<span><strong>{{ $l->judul }}</strong></span>
+							</a>
+						@endforeach
+					</div>
+				</div>
+			</aside>
+		</div>
+	</div>
 </section>
-
-{{-- Konten --}}
-<section style="padding:70px 0; background:#f8f9fa;">
-    <div class="container">
-        <div class="row">
-            {{-- Konten Utama --}}
-            <div class="col-lg-8 col-12 mb-4">
-                {{-- Deskripsi --}}
-                <div style="background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.06); margin-bottom:24px;">
-                    <h3 style="font-size:20px; font-weight:700; color:#1a2e5a; margin-bottom:16px; padding-bottom:12px; border-bottom:3px solid {{ $w }}; display:inline-block;">
-                        <i class="fa fa-info-circle" style="color:{{ $w }}; margin-right:8px;"></i>Tentang Jurusan
-                    </h3>
-                    <div style="color:#555; font-size:15px; line-height:1.9;">
-                        {!! $jurusan->keterangan !!}
-                    </div>
-                </div>
-
-                {{-- Prospek Karir --}}
-                <div style="background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.06);">
-                    <h3 style="font-size:20px; font-weight:700; color:#1a2e5a; margin-bottom:20px; padding-bottom:12px; border-bottom:3px solid {{ $w }}; display:inline-block;">
-                        <i class="fa fa-briefcase" style="color:{{ $w }}; margin-right:8px;"></i>Mengapa Memilih Jurusan Ini?
-                    </h3>
-                    <div style="display:flex; flex-wrap:wrap; gap:12px;">
-                        @php
-                        $keunggulan = [
-                            ['icon'=>'fa-users','text'=>'Tenaga pengajar berpengalaman & bersertifikat'],
-                            ['icon'=>'fa-building','text'=>'Fasilitas praktik modern & lengkap'],
-                            ['icon'=>'fa-handshake-o','text'=>'Kerjasama dengan industri terkemuka'],
-                            ['icon'=>'fa-certificate','text'=>'Sertifikasi kompetensi nasional'],
-                            ['icon'=>'fa-briefcase','text'=>'Peluang kerja & karir yang luas'],
-                            ['icon'=>'fa-graduation-cap','text'=>'Siap melanjutkan ke perguruan tinggi'],
-                        ];
-                        @endphp
-                        @foreach($keunggulan as $k)
-                        <div style="display:flex; align-items:center; gap:10px; background:#f8f9fa; border-radius:10px; padding:12px 16px; width:calc(50% - 6px);">
-                            <div style="width:36px; height:36px; border-radius:8px; background:{{ $w }}20; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                <i class="fa {{ $k['icon'] }}" style="color:{{ $w }}; font-size:14px;"></i>
-                            </div>
-                            <p style="color:#555; font-size:13px; margin:0; line-height:1.4;">{{ $k['text'] }}</p>
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-
-            {{-- Sidebar --}}
-            <div class="col-lg-4 col-12">
-                {{-- CTA Daftar --}}
-                <div style="background:linear-gradient(135deg, #1a2e5a 0%, {{ $w }} 100%); border-radius:16px; padding:28px; margin-bottom:24px; text-align:center;">
-                    <i class="fa fa-pencil-square-o" style="font-size:36px; color:#f0c040; display:block; margin-bottom:12px;"></i>
-                    <h4 style="color:#fff; font-size:18px; font-weight:700; margin-bottom:8px;">Tertarik Bergabung?</h4>
-                    <p style="color:rgba(255,255,255,0.8); font-size:13px; margin-bottom:20px;">Daftarkan diri sekarang dan raih masa depan cerah!</p>
-                    <a href="{{ url('/ppdb') }}" style="display:block; background:#f0c040; color:#1a2e5a; padding:12px; border-radius:25px; font-size:14px; font-weight:700; text-decoration:none;">
-                        Daftar Sekarang <i class="fa fa-arrow-right"></i>
-                    </a>
-                    <a href="https://wa.me/6281221724926" target="_blank" style="display:block; background:rgba(255,255,255,0.15); color:#fff; padding:12px; border-radius:25px; font-size:14px; font-weight:600; text-decoration:none; margin-top:10px; border:1px solid rgba(255,255,255,0.3);">
-                        <i class="fa fa-whatsapp" style="margin-right:6px;"></i>Hubungi Kami
-                    </a>
-                </div>
-
-                {{-- Info Singkat --}}
-                <div style="background:#fff; border-radius:16px; padding:24px; box-shadow:0 4px 20px rgba(0,0,0,0.06); margin-bottom:24px;">
-                    <h4 style="font-size:16px; font-weight:700; color:#1a2e5a; margin-bottom:16px;">Info Jurusan</h4>
-                    <div style="display:flex; flex-direction:column; gap:12px;">
-                        <div style="display:flex; align-items:center; gap:12px; padding-bottom:12px; border-bottom:1px solid #f0f0f0;">
-                            <div style="width:36px; height:36px; border-radius:8px; background:{{ $w }}15; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                <i class="fa fa-clock-o" style="color:{{ $w }};"></i>
-                            </div>
-                            <div>
-                                <p style="color:#999; font-size:11px; margin:0 0 2px;">Durasi Pendidikan</p>
-                                <p style="color:#1a2e5a; font-size:13px; font-weight:600; margin:0;">3 Tahun</p>
-                            </div>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:12px; padding-bottom:12px; border-bottom:1px solid #f0f0f0;">
-                            <div style="width:36px; height:36px; border-radius:8px; background:{{ $w }}15; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                <i class="fa fa-map-marker" style="color:{{ $w }};"></i>
-                            </div>
-                            <div>
-                                <p style="color:#999; font-size:11px; margin:0 0 2px;">Lokasi</p>
-                                <p style="color:#1a2e5a; font-size:13px; font-weight:600; margin:0;">{{ \App\Aplikasi::first()->alamat }}</p>
-                            </div>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <div style="width:36px; height:36px; border-radius:8px; background:{{ $w }}15; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                <i class="fa fa-phone" style="color:{{ $w }};"></i>
-                            </div>
-                            <div>
-                                <p style="color:#999; font-size:11px; margin:0 0 2px;">Kontak</p>
-                                <p style="color:#1a2e5a; font-size:13px; font-weight:600; margin:0;">{{ \App\Aplikasi::first()->telepon }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Jurusan Lainnya --}}
-                <div style="background:#fff; border-radius:16px; padding:24px; box-shadow:0 4px 20px rgba(0,0,0,0.06);">
-                    <h4 style="font-size:16px; font-weight:700; color:#1a2e5a; margin-bottom:16px;">Jurusan Lainnya</h4>
-                    @foreach(\App\Jurusan::where('id','!=',$jurusan->id)->get() as $l)
-                    <a href="{{ url('jurusan/'.$l->id) }}" style="display:flex; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid #f0f0f0; text-decoration:none;"
-                        onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
-                        @if($l->gambar)
-                        <div style="width:55px; height:55px; border-radius:10px; background-image:url('{{ asset($l->gambar) }}'); background-size:cover; background-position:center; flex-shrink:0;"></div>
-                        @else
-                        <div style="width:55px; height:55px; border-radius:10px; background:#f0f4ff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                            <i class="fa fa-graduation-cap" style="color:#1a73e8;"></i>
-                        </div>
-                        @endif
-                        <p style="color:#1a2e5a; font-size:13px; font-weight:600; margin:0; line-height:1.4;">{{ $l->judul }}</p>
-                    </a>
-                    @endforeach
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
 @endsection

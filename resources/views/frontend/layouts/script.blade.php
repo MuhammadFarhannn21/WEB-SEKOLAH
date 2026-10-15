@@ -18,7 +18,7 @@
 <script src="{{ asset('frontend/js/jquery.scrollUp.min.js') }}"></script>
 <script src="{{ asset('frontend/js/gmaps.min.js') }}"></script>
 <script src="{{ asset('frontend/js/main.js') }}"></script>
-<script src="{{ asset('frontend/js/modern.js') }}?v=4"></script>
+<script src="{{ asset('frontend/js/modern.js') }}?v=5"></script>
 <script src="{{ asset('vendor/sweetalert/sweetalert.all.js') }}"></script>
 
 @include('sweetalert::alert')
