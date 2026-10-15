@@ -378,6 +378,7 @@ body.drawer-open { overflow: hidden; }
     .m-burger { display: inline-flex; }
     .m-topbar .m-hide-sm { display: none; }
     .m-stats { grid-template-columns: repeat(2, 1fr); }
+    .m-stats > :last-child:nth-child(odd) { grid-column: span 2; }
     .m-track { grid-auto-columns: calc((100% - 24px) / 2); }
     .m-section { padding: 68px 0; }
     .m-cta { padding: 40px 30px; }
@@ -425,3 +426,174 @@ html, body { overflow-x: clip; }
 }
 .m-nav > li > a { white-space: nowrap; }
 @media (max-width: 1299px) { .m-nav > li > a { padding: 10px 9px; font-size: 13.5px; } .m-brand img { height: 40px; } }
+
+/* =========================================================
+   Tambahan v4: progress scroll, sambutan & visi-misi,
+   program keahlian interaktif, marquee mitra industri
+   ========================================================= */
+
+/* Progress bar membaca halaman */
+.m-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 3000; pointer-events: none; }
+.m-progress span { display: block; height: 100%; width: 100%; transform-origin: 0 50%; transform: scaleX(0); background: linear-gradient(90deg, var(--accent), var(--primary)); }
+
+/* Jumlah kolom statistik mengikuti angka yang tampil */
+.m-stats { grid-template-columns: repeat(var(--cols, 4), 1fr); }
+
+/* Tabs generik */
+.m-tab-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.m-tab-list button {
+    display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; color: var(--navy);
+    padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all .25s var(--ease);
+}
+.m-tab-list button:hover { border-color: var(--primary); color: var(--primary); }
+.m-tab-list button.active { background: var(--navy); border-color: var(--navy); color: #fff; box-shadow: 0 8px 18px rgba(19, 35, 74, .2); }
+.m-tab-panel { display: none; }
+.m-tab-panel.active { display: block; animation: m-fade-up .5s var(--ease) both; }
+
+/* Sambutan kepala sekolah + visi misi */
+.m-about { overflow: hidden; }
+.m-about::before {
+    content: ''; position: absolute; width: 520px; height: 520px; border-radius: 50%; left: -220px; top: -160px;
+    background: radial-gradient(circle, rgba(26, 115, 232, .08), transparent 70%); pointer-events: none;
+}
+.m-about-grid { display: grid; grid-template-columns: 5fr 7fr; gap: 64px; align-items: center; position: relative; }
+.m-principal { position: relative; max-width: 440px; margin: 0 auto; width: 100%; }
+.m-principal-photo {
+    position: relative; border-radius: 28px; overflow: hidden; aspect-ratio: 4 / 5;
+    background: linear-gradient(160deg, var(--primary), var(--navy)); box-shadow: var(--shadow-lg);
+}
+.m-principal-photo::before {
+    content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(to top, rgba(10, 18, 40, .55), transparent 45%);
+}
+.m-principal-photo img { width: 100%; height: 100%; object-fit: cover; object-position: top; transition: transform .8s var(--ease); }
+.m-principal:hover .m-principal-photo img { transform: scale(1.04); }
+.m-principal-badge {
+    position: absolute; top: 18px; left: 18px; z-index: 2; background: rgba(255, 255, 255, .92); color: var(--navy);
+    font-size: 12px; font-weight: 800; padding: 7px 14px; border-radius: 999px; backdrop-filter: blur(6px);
+}
+.m-principal-badge i { color: var(--accent); margin-right: 4px; }
+.m-principal-card {
+    position: relative; z-index: 3; margin: -70px 22px 0; background: #fff; border-radius: 20px; padding: 22px 24px;
+    box-shadow: var(--shadow-lg); border: 1px solid var(--line);
+}
+.m-principal-card > .fa-quote-left { position: absolute; top: -18px; right: 22px; width: 42px; height: 42px; border-radius: 12px; background: var(--accent); color: var(--navy); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.m-principal-card p { font-size: 16px; font-weight: 700; color: var(--navy); line-height: 1.55; margin: 0 0 12px; font-style: italic; }
+.m-principal-card strong { display: block; font-size: 14.5px; color: var(--ink); }
+.m-principal-card small { color: var(--muted); font-size: 12.5px; }
+.m-about-body .m-sub { margin-bottom: 26px; max-width: none; }
+.m-about-body .m-tabs { margin-bottom: 30px; }
+.m-about-body .m-tab-list { margin-bottom: 18px; }
+.m-visi {
+    margin: 0; padding: 22px 24px 22px 26px; border-radius: 18px; border-left: 4px solid var(--accent);
+    background: linear-gradient(120deg, rgba(26, 115, 232, .07), rgba(245, 184, 46, .07));
+    font-size: 16px; font-weight: 700; color: var(--navy); line-height: 1.7; letter-spacing: .01em;
+}
+.m-misi { list-style: none; counter-reset: misi; margin: 0; padding: 0; display: grid; gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 6px; }
+.m-misi li {
+    counter-increment: misi; display: flex; gap: 14px; align-items: flex-start; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; padding: 14px 16px; font-size: 14px; line-height: 1.65; color: var(--ink); transition: border-color .25s, transform .25s var(--ease);
+}
+.m-misi li:hover { border-color: rgba(26, 115, 232, .4); transform: translateX(4px); }
+.m-misi li::before {
+    content: counter(misi, decimal-leading-zero); flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px;
+    background: var(--primary-soft, rgba(26, 115, 232, .1)); color: var(--primary); font-weight: 800; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+}
+.m-about-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* Program keahlian interaktif */
+.m-program { display: grid; grid-template-columns: 360px 1fr; gap: 28px; align-items: stretch; }
+.m-program-list { display: flex; flex-direction: column; gap: 10px; }
+.m-program-list button {
+    --c: var(--primary);
+    display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; cursor: pointer;
+    background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; color: var(--navy);
+    font-weight: 700; font-size: 14.5px; transition: all .3s var(--ease); position: relative; overflow: hidden;
+}
+.m-program-list button::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); transform: scaleY(0); transition: transform .3s var(--ease); }
+.m-program-list button:hover { border-color: var(--c); transform: translateX(4px); }
+.m-program-list button.active { border-color: transparent; box-shadow: var(--shadow); transform: translateX(6px); }
+.m-program-list button.active::before { transform: none; }
+.m-program-list .logo { width: 46px; height: 46px; border-radius: 12px; background: color-mix(in srgb, var(--c) 12%, #fff); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--c); font-size: 18px; }
+.m-program-list .logo img { width: 34px; height: 34px; object-fit: contain; }
+.m-program-list .name { flex: 1; line-height: 1.35; }
+.m-program-list .arrow { color: var(--muted); transition: transform .25s, color .25s; }
+.m-program-list button.active .arrow { color: var(--c); transform: translateX(3px); }
+.m-program-panels { position: relative; }
+.m-program-panel.active { display: grid; }
+.m-program-panel {
+    --c: var(--primary);
+    grid-template-columns: 1fr 1.25fr; gap: 0; height: 100%; border-radius: 24px; overflow: hidden; background: #fff;
+    border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+.m-program-art {
+    position: relative; display: flex; align-items: center; justify-content: center; padding: 40px; min-height: 320px;
+    background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--c) 35%, #fff), var(--c));
+}
+.m-program-art::after { content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, .35); animation: m-spin 40s linear infinite; }
+@keyframes m-spin { to { transform: rotate(360deg); } }
+.m-program-art img { position: relative; z-index: 1; width: 100%; max-width: 210px; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .25)); animation: m-float 5s ease-in-out infinite; }
+@keyframes m-float { 50% { transform: translateY(-10px); } }
+.m-program-fallback { position: relative; z-index: 1; font-size: 110px; color: rgba(255, 255, 255, .9); animation: m-float 5s ease-in-out infinite; }
+.m-program-text { padding: 38px 36px; display: flex; flex-direction: column; justify-content: center; }
+.m-program-num { font-size: 12px; font-weight: 800; letter-spacing: .14em; color: var(--c); margin-bottom: 10px; }
+.m-program-text h3 { font-size: clamp(22px, 2.4vw, 28px); font-weight: 800; line-height: 1.25; margin: 0 0 14px; }
+.m-program-text p { color: var(--muted); font-size: 15px; line-height: 1.8; margin: 0 0 24px; }
+.m-program-text .m-btn { align-self: flex-start; background: var(--c); box-shadow: 0 8px 20px color-mix(in srgb, var(--c) 40%, transparent); }
+
+/* Marquee mitra industri */
+.m-partners { padding-bottom: 72px; }
+.m-marquee {
+    overflow: hidden; position: relative; padding: 8px 0;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.m-marquee-track { display: flex; gap: 18px; width: max-content; animation: m-marquee 60s linear infinite; }
+.m-marquee:hover .m-marquee-track { animation-play-state: paused; }
+@keyframes m-marquee { to { transform: translateX(calc(-50% - 9px)); } }
+.m-partner {
+    display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 22px 14px 14px; min-width: 240px; box-shadow: var(--shadow-sm); transition: all .3s var(--ease);
+}
+.m-partner:hover { border-color: rgba(26, 115, 232, .4); box-shadow: var(--shadow); transform: translateY(-3px); }
+.m-partner img { width: 52px; height: 52px; object-fit: contain; border-radius: 12px; flex-shrink: 0; }
+.m-partner .initial {
+    width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--navy-2), var(--primary)); color: #fff; font-weight: 800; font-size: 20px;
+}
+.m-partner:nth-child(3n+2) .initial { background: linear-gradient(135deg, #0f766e, #12a37f); }
+.m-partner:nth-child(3n) .initial { background: linear-gradient(135deg, #b45309, var(--accent)); }
+.m-partner .label { display: flex; flex-direction: column; line-height: 1.35; }
+.m-partner strong { font-size: 14px; color: var(--navy); white-space: nowrap; }
+.m-partner small { font-size: 12px; color: var(--muted); }
+
+@media (max-width: 991px) {
+    .m-about-grid { grid-template-columns: 1fr; gap: 48px; }
+    .m-program { grid-template-columns: 1fr; }
+    .m-stats { grid-template-columns: repeat(2, 1fr); }
+    .m-stats > :last-child:nth-child(odd) { grid-column: span 2; }
+    .m-program-list { flex-direction: row; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: none; }
+    .m-program-list::-webkit-scrollbar { display: none; }
+    .m-program-list button { width: auto; flex: 0 0 auto; scroll-snap-align: start; }
+    .m-program-list button:hover, .m-program-list button.active { transform: none; }
+    .m-program-list .arrow { display: none; }
+}
+@media (max-width: 767px) {
+    .m-stats { grid-template-columns: repeat(2, 1fr); }
+    .m-stats > :last-child:nth-child(odd) { grid-column: span 2; }
+    .m-program-panel.active { grid-template-columns: 1fr; }
+    .m-program-art { min-height: 220px; padding: 28px; }
+    .m-program-art img { max-width: 150px; }
+    .m-program-art::after { width: 190px; height: 190px; }
+    .m-program-text { padding: 26px 22px; }
+    .m-principal { max-width: 340px; }
+    .m-principal-card { margin: -60px 14px 0; }
+    .m-program-fallback { font-size: 80px; }
+    .m-fab a, .m-fab button { width: 48px; height: 48px; font-size: 21px; }
+    .m-fab .wa-label { display: none; }
+    .m-partner { min-width: 210px; padding: 12px 18px 12px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .m-marquee { overflow-x: auto; }
+}

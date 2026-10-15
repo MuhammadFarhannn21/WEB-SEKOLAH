@@ -20,7 +20,7 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-        <link href="{{ asset('backend/assets/css/modern-admin.css') }}?v=2" rel="stylesheet" type="text/css">
+        <link href="{{ asset('backend/assets/css/modern-admin.css') }}?v=3" rel="stylesheet" type="text/css">
         <script src="{{ asset('js/currency.js')}}"></script>
 
         <style type="text/css">

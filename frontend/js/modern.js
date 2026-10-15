@@ -139,3 +139,56 @@
         track.addEventListener('dragstart', function (e) { e.preventDefault(); });
     });
 })();
+
+/* =========================================================
+   Tambahan v4: progress scroll + tabs (visi-misi, jurusan)
+   ========================================================= */
+(function () {
+    'use strict';
+
+    /* Progress bar membaca halaman */
+    var bar = document.querySelector('.m-progress span');
+    if (bar) {
+        var ticking = false;
+        var paint = function () {
+            var h = document.documentElement.scrollHeight - window.innerHeight;
+            bar.style.transform = 'scaleX(' + (h > 0 ? Math.min(window.pageYOffset / h, 1) : 0) + ')';
+            ticking = false;
+        };
+        window.addEventListener('scroll', function () {
+            if (!ticking) { ticking = true; requestAnimationFrame(paint); }
+        }, { passive: true });
+        paint();
+    }
+
+    /* Tabs: tombol [data-tab] menampilkan panel [data-panel] di dalam [data-tabs] */
+    document.querySelectorAll('[data-tabs]').forEach(function (group) {
+        var buttons = group.querySelectorAll('[data-tab]');
+        function activate(btn) {
+            var key = btn.getAttribute('data-tab');
+            buttons.forEach(function (b) {
+                var on = b === btn;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            group.querySelectorAll('[data-panel]').forEach(function (p) {
+                p.classList.toggle('active', p.getAttribute('data-panel') === key);
+            });
+            // pada layar kecil, geser tombol aktif agar terlihat
+            if (btn.parentElement.scrollWidth > btn.parentElement.clientWidth) {
+                btn.parentElement.scrollTo({ left: btn.offsetLeft - 16, behavior: 'smooth' });
+            }
+        }
+        buttons.forEach(function (b, i) {
+            b.addEventListener('click', function () { activate(b); });
+            b.addEventListener('keydown', function (e) {
+                var dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0;
+                if (!dir) return;
+                e.preventDefault();
+                var next = buttons[(i + dir + buttons.length) % buttons.length];
+                next.focus();
+                activate(next);
+            });
+        });
+    });
+})();
