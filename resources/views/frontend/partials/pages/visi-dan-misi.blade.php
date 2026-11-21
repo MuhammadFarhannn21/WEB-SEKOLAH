@@ -5,6 +5,11 @@
 	$nilai = [['fa-star', 'Unggul', 'bg-g1'], ['fa-heart', 'Integritas', 'bg-g3'], ['fa-users', 'Kolaborasi', 'bg-g4'], ['fa-lightbulb-o', 'Inovatif', 'bg-g2']];
 @endphp
 
+@php $pengantar = trim(html_entity_decode(strip_tags($post->body))); @endphp
+@if(mb_strlen($pengantar) > 60 && !str_contains($pengantar, 'dst.'))
+<p class="m-lead reveal">{{ $pengantar }}</p>
+@endif
+
 <div class="m-vision reveal">
 	<span class="m-vision-icon"><i class="fa fa-eye"></i></span>
 	<span class="m-vision-label">Visi</span>
